@@ -1,0 +1,19 @@
+.leftMenu {
+  width: 15%;
+}
+
+.subItems {
+  display: flex;
+  flex-direction: column;
+}
+
+.subItem {
+  padding: 1rem;
+  color: inherit;
+  text-decoration: none;
+  transition: background-color 0.2s;
+}
+
+.subItem:hover {
+  background-color: #4a5568;
+}

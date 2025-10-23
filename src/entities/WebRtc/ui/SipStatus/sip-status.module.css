@@ -1,0 +1,12 @@
+.sipStatus {
+  display: flex;
+  align-items: center;
+}
+
+.online {
+  color: green;
+}
+
+.offline {
+  color: red;
+}

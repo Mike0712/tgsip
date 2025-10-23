@@ -1,0 +1,21 @@
+.logoutButton {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  padding: 1rem;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.logoutButton:hover {
+  background-color: #4a5568;
+}
+
+.icon {
+  width: 1.5rem;
+  height: 1.5rem;
+  margin-right: 0.5rem;
+}

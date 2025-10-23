@@ -1,0 +1,131 @@
+/* src/shared/styles/Handset.module.css */
+.handset {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background-color: #f0f0f0;
+  padding: 1rem;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.keypad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.digitButton {
+  width: 3rem;
+  height: 3rem;
+  background-color: #ffffff;
+  border: 1px solid #ccc;
+  border-radius: 50%;
+  font-size: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.digitButton:hover {
+  background-color: #e0e0e0;
+}
+
+.actions {
+  display: flex;
+  gap: 1rem;
+}
+
+.callButton {
+  background-color: #4caf50;
+  color: #ffffff;
+  border: none;
+  border-radius: 50%;
+  width: 4rem;
+  height: 4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.callButton:hover {
+  background-color: #45a049;
+}
+
+.hangupButton {
+  background-color: #f44336;
+  color: #ffffff;
+  border: none;
+  border-radius: 50%;
+  width: 4rem;
+  height: 4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.phoneBar {
+  margin-bottom: 10px;
+}
+
+.hangupButton:hover {
+  background-color: #e53935;
+}
+
+.icon {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.phoneIconContainer {
+  position: relative;
+  width: 4rem;
+  height: 4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.phoneIcon {
+  width: 24px;
+  height: 24px;
+  z-index: 2;
+  color: #4CAF50; /* Adjust icon color */
+}
+
+.wave {
+  position: absolute;
+  width: 4rem;
+  height: 4rem;
+  border-radius: 50%;
+  background-color: rgba(76, 175, 80, 0.5);
+  animation: ring 1.5s infinite;
+  z-index: 1;
+}
+
+.wave:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.wave:nth-child(2) {
+  animation-delay: 0.75s;
+}
+
+@keyframes ring {
+  0% {
+    transform: scale(0.5);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}

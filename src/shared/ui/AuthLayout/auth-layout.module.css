@@ -1,0 +1,15 @@
+.layout {
+  display: flex;
+  height: 100vh;
+}
+
+.mainContent {
+  display: flex;
+  flex-grow: 1;
+}
+
+.content {
+  flex-grow: 1;
+  padding: 2rem;
+  background-color: #f7fafc;
+}
