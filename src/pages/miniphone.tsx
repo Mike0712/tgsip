@@ -5,6 +5,7 @@ import store, { RootState } from '@/app/store';
 import { useAuth } from '@/hooks/useAuth'
 import { apiClient } from '@/lib/api'
 import { useSelector } from 'react-redux';
+import AudioButton from '@/shared/ui/AudioButton/audio-button';
 
 // Динамический импорт для предотвращения SSR ошибок
 const DialerTelegram = dynamic(() => import('@/widgets/Dialer/dialer-telegram'), {
@@ -296,6 +297,9 @@ const MiniPhone = () => {
           </p>
         </div>
       </div>
+      
+      {/* Кнопка для разблокировки звука на мобильных */}
+      <AudioButton />
     </div>
   );
 }

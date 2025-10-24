@@ -67,10 +67,22 @@ class SipService {
       });
   }
 
-  makeCall(phone: string, listener: (state: string) => void) {
+  async makeCall(phone: string, listener: (state: string) => void) {
     const extraHeaders: string[] = [];
     const target = UserAgent.makeURI(`sip:${phone}@${this.host}`);
     try {
+      // Запрашиваем микрофон ДО звонка (критично для мобильных)
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        console.log('🎤 Microphone access granted');
+        // Останавливаем стрим, SIP.js создаст свой
+        stream.getTracks().forEach(track => track.stop());
+      } catch (micError) {
+        console.error('❌ Microphone access denied:', micError);
+        alert('Для звонка необходим доступ к микрофону');
+        return;
+      }
+
       if (this.userAgent instanceof UserAgent && target instanceof URI) {
         this.session = new Inviter(this.userAgent, target, {
           sessionDescriptionHandlerOptions: {
@@ -138,12 +150,30 @@ class SipService {
           for (const receiver of peerConnection.getReceivers()) {
             if (receiver.track) {
               remoteStream.addTrack(receiver.track);
+              console.log('🎵 Added remote track:', receiver.track.kind);
             }
           }
         }
       }
       mediaElement.srcObject = remoteStream;
-      return mediaElement.play();
+      mediaElement.volume = 1.0;
+      
+      // Критично для iOS/Safari
+      mediaElement.setAttribute('playsinline', 'true');
+      mediaElement.setAttribute('autoplay', 'true');
+      
+      console.log('🔊 Starting remote media playback...');
+      return mediaElement.play()
+        .then(() => console.log('✅ Remote audio playing'))
+        .catch(err => {
+          console.error('❌ Audio playback failed:', err);
+          // Уведомляем UI что нужен user interaction
+          window.dispatchEvent(new Event('audio-play-failed'));
+          // Попытка воспроизведения после user interaction
+          document.addEventListener('click', () => {
+            mediaElement.play().catch(console.error);
+          }, { once: true });
+        });
     }
   }
 

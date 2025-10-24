@@ -70,6 +70,8 @@ const SipStatus = () => {
       )}
       <audio
         id="mediaElement"
+        autoPlay
+        playsInline
       />
     </div>
   );
