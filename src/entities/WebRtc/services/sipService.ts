@@ -7,7 +7,7 @@ class SipService {
   private registerer: Registerer | null = null;
   private session: Inviter | Invitation | object = {};
 
-  constructor(private host: string | null, private username: string, private password: string) {}
+  constructor(private host: string | null, private username: string, private password: string) { }
 
   initialize() {
     const userAgentOptions: UserAgentOptions = {
@@ -47,7 +47,7 @@ class SipService {
       .then((registerer) => {
         registerer?.stateChange.addListener((state) => {
           console.log('📞 Registerer state:', state);
-          switch(state) {
+          switch (state) {
             case RegistererState.Initial:
               break;
             case RegistererState.Registered:
@@ -86,7 +86,7 @@ class SipService {
           this.session.invite();
         }
       }
-    } catch($e) {
+    } catch ($e) {
       console.log($e, 'err');
     }
   }
@@ -115,7 +115,7 @@ class SipService {
         duration: 100,
         interToneGap: 70
       };
-      
+
       this.session.sessionDescriptionHandler?.sendDtmf(tone, dtmfOptions);
       console.log('📞 DTMF sent:', tone);
     } else {
@@ -124,7 +124,7 @@ class SipService {
   }
 
   private setupRemoteMedia() {
-    const mediaElement = document.getElementById('mediaElement');
+    const mediaElement = document.getElementById('mediaElement') as HTMLMediaElement | null;
     const remoteStream = new MediaStream();
     if (mediaElement) {
       mediaElement.addEventListener('error', console.error);
@@ -133,11 +133,14 @@ class SipService {
       mediaElement.addEventListener('volumechange', console.log);
       mediaElement.addEventListener('ended', console.log);
       if (this.session instanceof Session) {
-        for (const receiver of this.session?.sessionDescriptionHandler?.peerConnection?.getReceivers()) {
-          if (receiver.track) {
+        const peerConnection = (this.session.sessionDescriptionHandler as any)?.peerConnection;
+        if (peerConnection) {
+          for (const receiver of peerConnection.getReceivers()) {
+            if (receiver.track) {
               remoteStream.addTrack(receiver.track);
+            }
           }
-      }
+        }
       }
       mediaElement.srcObject = remoteStream;
       return mediaElement.play();
@@ -150,7 +153,7 @@ class SipService {
         this.setupRemoteMedia();
         break;
       case SessionState.Terminated:
-        break;  
+        break;
     }
   }
 }

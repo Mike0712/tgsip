@@ -4,7 +4,7 @@ import { Menu } from '@headlessui/react';
 import { ChevronRightIcon, ChevronDownIcon } from '@heroicons/react/solid';
 import cls from './menu-item.module.css';
 
-const MenuItem = ({ children, title }) => {
+const MenuItem = ({ children, title }: { children: React.ReactNode, title: string }) => {
   const [isOpen, setIsOpen] = useState(false);
 
   return (

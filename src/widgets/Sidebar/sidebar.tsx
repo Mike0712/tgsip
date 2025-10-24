@@ -17,7 +17,7 @@ const Sidebar = () => {
       </div>
       <div className={cls.right}>
         <Profile />
-        {enabled && <SipStatus host={host} />}
+        {enabled && <SipStatus />}
         <Logout />
       </div>
     </div>

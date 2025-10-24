@@ -19,7 +19,7 @@ const App = ({ Component, pageProps }: AppProps) => {
     <Provider store={store}>
       <AuthLayout 
         sidebar={<Sidebar />}
-        leftMenu={hideLeftMenu ? null : <LeftMenu />}
+        leftMenu={hideLeftMenu ? undefined : <LeftMenu /> as unknown as React.ReactElement}
         content={<Component {...pageProps} />}
       />
     </Provider>

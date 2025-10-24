@@ -1,5 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { SipAccount, UserPhone } from '@/lib/api';
+import { SipAccount, UserPhone, Server, Phone, UserSipConfig } from '@/lib/api';
 
 interface SipState {
   status: 'online' | 'offline';
@@ -13,6 +13,11 @@ interface SipState {
   sipAccounts: SipAccount[];
   selectedAccount: SipAccount | null;
   userPhones: UserPhone[];
+  servers: Server[];
+  phones: Phone[];
+  userSipConfigs: UserSipConfig[];
+  selectedServer: Server | null;
+  currentCredentials: { username: string; password: string } | null;
 }
 
 const initialState: SipState = {
@@ -26,7 +31,12 @@ const initialState: SipState = {
   hangup: false,
   sipAccounts: [],
   selectedAccount: null,
-  userPhones: []
+  userPhones: [],
+  servers: [],
+  phones: [],
+  userSipConfigs: [],
+  selectedServer: null,
+  currentCredentials: null
 };
 
 const sipSlice = createSlice({
@@ -72,6 +82,21 @@ const sipSlice = createSlice({
     },
     setUserPhones: (state, action: PayloadAction<UserPhone[]>) => {
       state.userPhones = action.payload;
+    },
+    setServers: (state, action: PayloadAction<Server[]>) => {
+      state.servers = action.payload;
+    },
+    setPhones: (state, action: PayloadAction<Phone[]>) => {
+      state.phones = action.payload;
+    },
+    setUserSipConfigs: (state, action: PayloadAction<UserSipConfig[]>) => {
+      state.userSipConfigs = action.payload;
+    },
+    setSelectedServer: (state, action: PayloadAction<Server | null>) => {
+      state.selectedServer = action.payload;
+    },
+    setCurrentCredentials: (state, action: PayloadAction<{ username: string; password: string } | null>) => {
+      state.currentCredentials = action.payload;
     }
   },
 });
@@ -86,7 +111,12 @@ export const {
   setHangup,
   setSipAccounts,
   setSelectedAccount,
-  setUserPhones
+  setUserPhones,
+  setServers,
+  setPhones,
+  setUserSipConfigs,
+  setSelectedServer,
+  setCurrentCredentials
 } = sipSlice.actions;
 
 export default sipSlice.reducer;

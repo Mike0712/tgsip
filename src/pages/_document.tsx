@@ -7,7 +7,7 @@ export default function Document() {
         {/* Telegram Web Apps Script */}
         <script 
           src="https://telegram.org/js/telegram-web-app.js" 
-          strategy="beforeInteractive"
+          async
         />
       </Head>
       <body>
