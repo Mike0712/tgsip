@@ -3,7 +3,7 @@ import cls from "./handset.module.css";
 import { PhoneIcon, XIcon } from "@heroicons/react/solid";
 import { useSelector } from 'react-redux';
 import store, { RootState } from "@/app/store";
-import { setAnswer, setInvite, setHangup } from '@/entities/WebRtc/model/slice';
+import { setAnswer, setInvite, setHangup, setSelectedCallerId as setReduxCallerId } from '@/entities/WebRtc/model/slice';
 import DtmfPad from "@/entities/WebRtc/ui/DtmfPad/dtmf-pad";
 import { getSipServiceInstance } from "@/entities/WebRtc/services/sipServiceInstance";
 import { UserPhone } from "@/lib/api";
@@ -82,11 +82,8 @@ const Handset = (props: HandsetProps) => {
 
   const handleCall = () => {
     if (dialingNumber.trim()) {
-      // Передаем номер и выбранный caller ID
-      const callData = {
-        number: dialingNumber,
-        callerId: selectedCallerId?.phone_number || null
-      };
+      // Сохраняем выбранный caller ID в Redux
+      store.dispatch(setReduxCallerId(selectedCallerId?.phone_number || null));
       
       onCall(dialingNumber);
       
