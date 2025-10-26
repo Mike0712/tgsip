@@ -13,6 +13,7 @@ const SipStatus = () => {
   const answer = useSelector((state: RootState) => state.sip.answer);
   const hangup = useSelector((state: RootState) => state.sip.hangup);
   const selectedAccount = useSelector((state: RootState) => state.sip.selectedAccount);
+  const selectedCallerId = useSelector((state: RootState) => state.sip.selectedCallerId);
 
   const stateListener = (state: string) => {
     store.dispatch(setSessionState(state))
@@ -43,9 +44,9 @@ const SipStatus = () => {
   useEffect(() => {
     if (manualCall) {
       const phoneNumber = manualCall;
-      sipService && sipService.makeCall(phoneNumber, stateListener);
+      sipService && sipService.makeCall(phoneNumber, stateListener, selectedCallerId);
     }
-  }, [manualCall]);
+  }, [manualCall, selectedCallerId]);
   useEffect(() => {
     if (answer) {
       sipService?.answer();

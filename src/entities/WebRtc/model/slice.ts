@@ -7,6 +7,7 @@ interface SipState {
   serverPort: number | null;
   sessionState: string;
   manualCall: false | string;
+  selectedCallerId: string | null;
   invite: boolean;
   answer: boolean;
   hangup: boolean;
@@ -26,6 +27,7 @@ const initialState: SipState = {
   serverPort: null,
   sessionState: '',
   manualCall: false,
+  selectedCallerId: null,
   invite: false,
   answer: false,
   hangup: false,
@@ -57,6 +59,9 @@ const sipSlice = createSlice({
     },
     setManualCall: (state, action: PayloadAction<false | string>) => {
       state.manualCall = action.payload;
+    },
+    setSelectedCallerId: (state, action: PayloadAction<string | null>) => {
+      state.selectedCallerId = action.payload;
     },
     setInvite: (state, action: PayloadAction<boolean>) => {
       state.invite = action.payload;
@@ -104,7 +109,8 @@ const sipSlice = createSlice({
 export const { 
   setStatus, 
   setServerUrl, 
-  setManualCall, 
+  setManualCall,
+  setSelectedCallerId,
   setSessionState, 
   setInvite, 
   setAnswer, 

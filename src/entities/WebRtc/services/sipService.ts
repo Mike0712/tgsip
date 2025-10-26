@@ -67,8 +67,16 @@ class SipService {
       });
   }
 
-  async makeCall(phone: string, listener: (state: string) => void) {
+  async makeCall(phone: string, listener: (state: string) => void, callerId?: string | null) {
     const extraHeaders: string[] = [];
+    
+    // Добавляем Caller ID в SIP headers если передан
+    if (callerId) {
+      extraHeaders.push(`P-Asserted-Identity: <sip:${callerId}@${this.host}>`);
+      extraHeaders.push(`Remote-Party-ID: <sip:${callerId}@${this.host}>;party=calling;privacy=off`);
+      console.log('📞 Using Caller ID:', callerId);
+    }
+    
     const target = UserAgent.makeURI(`sip:${phone}@${this.host}`);
     try {
       // Запрашиваем микрофон ДО звонка (критично для мобильных)

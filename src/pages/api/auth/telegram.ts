@@ -47,9 +47,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         ...(query_id ? { query_id } : {}),
         ...(userStr ? { user: userStr } : {}),
       };
+      console.log('🔐 Validating Telegram signature in production...', {
+        hasBotToken: !!botToken,
+        dataKeys: Object.keys(dataForValidation)
+      });
       if (!validateTelegramData({ ...dataForValidation, hash }, botToken)) {
+        console.error('❌ Telegram signature validation failed');
         return res.status(401).json({ error: 'Invalid Telegram data signature' });
       }
+      console.log('✅ Telegram signature valid');
     }
 
     // Проверяем время (данные не старше 24 часов)
