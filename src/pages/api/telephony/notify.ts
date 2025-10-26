@@ -26,14 +26,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    // Получаем данные пользователя
-    const user = await userService.findByTelegramId(user_id);
+    // Получаем данные пользователя по ID
+    const user = await userService.findById(parseInt(user_id));
 
     if (!user) {
       return res.status(404).json({ 
         success: false,
         error: 'User not found',
         message: `User with ID ${user_id} not found`
+      });
+    }
+
+    if (!user.telegram_id) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'User has no Telegram ID',
+        message: `User ${user_id} is not linked to Telegram`
       });
     }
 

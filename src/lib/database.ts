@@ -72,6 +72,10 @@ export interface UserPhone {
 
 // Функции для работы с пользователями
 export const userService = {
+  async findById(id: number): Promise<User | null> {
+    return await db('users').where('id', id).first();
+  },
+
   async findByTelegramId(telegramId: string): Promise<User | null> {
     return await db('users').where('telegram_id', telegramId).first();
   },
