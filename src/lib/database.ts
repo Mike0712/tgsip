@@ -212,3 +212,21 @@ export const userPhoneService = {
     return deleted > 0;
   }
 };
+
+// Функции для работы с телефонией
+export const telephonyService = {
+  async findUserByDID(did: string): Promise<{ user_id: number; sip_username: string } | null> {
+    const result = await db('user_phones')
+      .select('users.id as user_id', 'sip_accounts.sip_username')
+      .join('users', 'user_phones.user_id', 'users.id')
+      .join('sip_accounts', function() {
+        this.on('sip_accounts.user_id', '=', 'users.id')
+          .andOn('sip_accounts.is_active', '=', db.raw('?', [true]));
+      })
+      .join('phones', 'user_phones.phone_id', 'phones.id')
+      .where('phones.number', did)
+      .first();
+    
+    return result || null;
+  }
+};
