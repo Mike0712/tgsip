@@ -106,14 +106,40 @@ export const userService = {
 // Функции для работы с сессиями
 export const sessionService = {
   async create(userId: number, token: string, expiresAt: Date, deviceInfo?: string, ipAddress?: string): Promise<Session> {
-    const [session] = await db('sessions').insert({
-      user_id: userId,
-      token,
-      expires_at: expiresAt,
-      device_info: deviceInfo,
-      ip_address: ipAddress
-    }).returning('*');
-    return session;
+    // Если сессия с таким токеном уже существует, удаляем её (token уникален)
+    await db('sessions').where('token', token).del();
+    
+    try {
+      const result = await db('sessions').insert({
+        user_id: userId,
+        token,
+        expires_at: expiresAt,
+        device_info: deviceInfo,
+        ip_address: ipAddress,
+        is_active: true
+      }).returning('*');
+      
+      if (!result || result.length === 0) {
+        throw new Error('Failed to create session: no data returned from database');
+      }
+      
+      const [session] = result;
+      if (!session) {
+        throw new Error('Failed to create session: session object is undefined');
+      }
+      
+      return session;
+    } catch (error: any) {
+      // Логируем детали ошибки
+      console.error('❌ Session creation error:', {
+        userId,
+        tokenLength: token.length,
+        errorMessage: error.message,
+        errorCode: error.code,
+        errorDetail: error.detail
+      });
+      throw error;
+    }
   },
 
   async findByToken(token: string): Promise<Session | null> {

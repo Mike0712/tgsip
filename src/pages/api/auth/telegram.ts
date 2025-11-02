@@ -112,22 +112,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log('🔐 Creating session...', {
       userId: user.id,
       tokenLength: token.length,
-      expiresAt,
-      deviceInfo,
+      expiresAt: expiresAt.toISOString(),
+      deviceInfo: deviceInfo?.substring(0, 100),
       ipAddress
     });
     
+    let session;
     try {
-      const session = await sessionService.create(
+      session = await sessionService.create(
         user.id,
         token,
         expiresAt,
         deviceInfo,
         ipAddress
       );
-      console.log('✅ Session created:', session.id);
-    } catch (sessionError) {
-      console.error('❌ Session creation failed:', sessionError);
+      console.log('✅ Session created successfully:', {
+        sessionId: session.id,
+        userId: session.user_id,
+        expiresAt: session.expires_at
+      });
+    } catch (sessionError: any) {
+      console.error('❌ Session creation failed:', {
+        error: sessionError.message,
+        stack: sessionError.stack,
+        userId: user.id,
+        errorCode: sessionError.code
+      });
       throw sessionError;
     }
 
