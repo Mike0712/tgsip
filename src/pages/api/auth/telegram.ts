@@ -41,19 +41,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Проверяем подпись (в продакшене)
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
     if (process.env.NODE_ENV === 'production' && botToken) {
-      // Формируем объект как в документации: все поля кроме hash; user = исходная JSON-строка
-      const dataForValidation: Record<string, string> = {
-        auth_date,
-        ...(query_id ? { query_id } : {}),
-        ...(userStr ? { user: userStr } : {}),
-      };
+      const dataForValidation: Record<string, string> = {};
+      Array.from(urlParams.entries()).forEach(([key, value]) => {
+        if (key !== 'hash' && value) {
+          dataForValidation[key] = value;
+        }
+      });
       console.log('🔐 Validating Telegram signature in production...', {
         hasBotToken: !!botToken,
-        dataKeys: Object.keys(dataForValidation)
+        dataKeys: Object.keys(dataForValidation),
+        hash: hash ? 'present' : 'missing'
       });
       if (!validateTelegramData({ ...dataForValidation, hash }, botToken)) {
-        console.error('❌ Telegram signature validation failed');
-        // return res.status(401).json({ error: 'Invalid Telegram data signature' });
+        console.error('❌ Telegram signature validation failed', {
+          dataKeys: Object.keys(dataForValidation),
+          dataValues: dataForValidation,
+          hash,
+          hasBotToken: !!botToken
+        });
+        return res.status(401).json({ error: 'Invalid Telegram data signature' });
       } else {
         console.log('✅ Telegram signature valid');
       }
@@ -100,13 +106,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Создаем сессию в базе данных
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 дней
-    await sessionService.create(
-      user.id,
-      token,
+    const deviceInfo = req.headers['user-agent'];
+    const ipAddress = req.headers['x-forwarded-for'] as string || (req.socket as any)?.remoteAddress;
+    
+    console.log('🔐 Creating session...', {
+      userId: user.id,
+      tokenLength: token.length,
       expiresAt,
-      req.headers['user-agent'],
-      req.headers['x-forwarded-for'] as string || (req.socket as any)?.remoteAddress
-    );
+      deviceInfo,
+      ipAddress
+    });
+    
+    try {
+      const session = await sessionService.create(
+        user.id,
+        token,
+        expiresAt,
+        deviceInfo,
+        ipAddress
+      );
+      console.log('✅ Session created:', session.id);
+    } catch (sessionError) {
+      console.error('❌ Session creation failed:', sessionError);
+      throw sessionError;
+    }
 
     res.status(200).json({
       success: true,
