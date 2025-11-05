@@ -21,6 +21,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const { initData } = req.body;
     
+    console.log('📥 Telegram auth request:', {
+      hasInitData: !!initData,
+      initDataLength: initData?.length,
+      initDataPreview: initData?.substring(0, 200),
+      nodeEnv: process.env.NODE_ENV,
+      hasBotToken: !!process.env.TELEGRAM_BOT_TOKEN,
+    });
+    
     if (!initData) {
       return res.status(400).json({ error: 'Telegram init data is required' });
     }
@@ -32,14 +40,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const hash = urlParams.get('hash') || '';
     const query_id = urlParams.get('query_id') || undefined;
 
+    console.log('🔍 Parsed initData:', {
+      hasUser: !!userStr,
+      hasAuthDate: !!auth_date,
+      hasHash: !!hash,
+      hasQueryId: !!query_id,
+      authDate: auth_date,
+      userPreview: userStr?.substring(0, 100),
+    });
+
     const parsedUser: TelegramUser | null = userStr ? JSON.parse(userStr) : null;
     if (!parsedUser?.id) {
+      console.error('❌ No user in initData');
       return res.status(401).json({ error: 'Invalid Telegram init data: no user' });
     }
 
+    console.log('✅ User parsed:', { userId: parsedUser.id, username: parsedUser.username });
+
     // Проверяем подпись (в продакшене)
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
-    if (process.env.NODE_ENV === 'production' && botToken) {
+    const isProduction = process.env.NODE_ENV === 'production';
+    
+    if (isProduction && botToken) {
       const dataForValidation: Record<string, string> = {};
       Array.from(urlParams.entries()).forEach(([key, value]) => {
         if (key !== 'hash' && value) {
@@ -51,10 +73,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         dataKeys: Object.keys(dataForValidation),
         hash: hash ? 'present' : 'missing'
       });
-      if (!validateTelegramData({ ...dataForValidation, hash }, botToken)) {
+      
+      const isValid = validateTelegramData({ ...dataForValidation, hash }, botToken);
+      if (!isValid) {
         console.error('❌ Telegram signature validation failed', {
           dataKeys: Object.keys(dataForValidation),
-          dataValues: dataForValidation,
           hash,
           hasBotToken: !!botToken
         });
@@ -62,20 +85,52 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       } else {
         console.log('✅ Telegram signature valid');
       }
+    } else if (isProduction && !botToken) {
+      console.error('❌ Production mode but TELEGRAM_BOT_TOKEN is missing');
+      return res.status(500).json({ error: 'Server configuration error' });
     }
 
-    // Проверяем время (данные не старше 24 часов)
-    const authDate = parseInt(auth_date) * 1000;
-    const now = Date.now();
-    if (now - authDate > 24 * 60 * 60 * 1000) {
-      return res.status(401).json({ error: 'Telegram data is too old' });
+    // Проверяем время (данные не старше 24 часов) - только если есть auth_date
+    if (auth_date) {
+      const authDate = parseInt(auth_date) * 1000;
+      const now = Date.now();
+      const ageInHours = (now - authDate) / (1000 * 60 * 60);
+      
+      console.log('⏰ Auth date check:', {
+        authDate: new Date(authDate).toISOString(),
+        now: new Date(now).toISOString(),
+        ageInHours: ageInHours.toFixed(2),
+        isValid: now - authDate <= 24 * 60 * 60 * 1000
+      });
+      
+      if (isNaN(authDate) || now - authDate > 24 * 60 * 60 * 1000) {
+        console.error('❌ Telegram data is too old or invalid:', { 
+          authDate: auth_date,
+          parsedAuthDate: authDate,
+          ageInHours: ageInHours.toFixed(2),
+          isNaN: isNaN(authDate)
+        });
+        return res.status(401).json({ error: 'Telegram data is too old' });
+      }
+    } else if (isProduction) {
+      console.error('❌ Production mode but auth_date is missing');
+      return res.status(401).json({ error: 'Invalid Telegram init data: missing auth_date' });
     }
 
     // Проверяем существует ли пользователь в базе данных (по telegram_id)
+    console.log('🔍 Searching user in DB:', { telegramId: parsedUser.id, telegramIdType: typeof parsedUser.id });
     let user = await userService.findByTelegramId(String(parsedUser.id));
+    
+    console.log('👤 User lookup result:', { 
+      found: !!user, 
+      userId: user?.id,
+      telegramId: user?.telegram_id,
+      telegramIdType: typeof user?.telegram_id
+    });
     
     if (!user) {
       // Пользователь не найден - доступ запрещен
+      console.error('❌ User not found in database:', { telegramId: parsedUser.id });
       return res.status(403).json({ 
         success: false,
         error: 'Access denied',
