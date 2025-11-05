@@ -77,6 +77,34 @@ interface UserPhone {
   server_port?: string;
 }
 
+interface InviteLink {
+  id: number;
+  token: string;
+  creator_id: number;
+  creator_telegram_id: string;
+  creator_sip_username?: string;
+  status: 'active' | 'expired' | 'completed';
+  created_at: string;
+  expires_at?: string;
+}
+
+interface InviteInfo {
+  invite: InviteLink;
+  creator: {
+    telegram_id: string;
+    username?: string;
+    first_name: string;
+    sip_username?: string;
+  };
+}
+
+interface JoinInviteResponse {
+  invite: InviteLink;
+  sip_account?: SipAccount;
+  partner_sip_username?: string;
+  ready_to_call: boolean;
+}
+
 class ApiClient {
   private baseUrl: string;
   private token: string | null = null;
@@ -264,10 +292,41 @@ class ApiClient {
   async getUserPhones(): Promise<ApiResponse<{ phones: UserPhone[]; count: number }>> {
     return this.request<{ phones: UserPhone[]; count: number }>('/user-phones');
   }
+
+  // Add user to Asterisk (external API)
+  // telegramId берется из токена аутентификации
+  async addUser(): Promise<ApiResponse<SipAccount>> {
+    return this.request<SipAccount>('/users/add', {
+      method: 'POST',
+    });
+  }
+
+  // Invite links endpoints
+  async createInviteLink(): Promise<ApiResponse<InviteLink>> {
+    return this.request<InviteLink>('/invite/create', {
+      method: 'POST',
+    });
+  }
+
+  async getInviteInfo(token: string): Promise<ApiResponse<InviteInfo>> {
+    return this.request<InviteInfo>(`/invite/${token}`);
+  }
+
+  async joinInvite(token: string): Promise<ApiResponse<JoinInviteResponse>> {
+    return this.request<JoinInviteResponse>(`/invite/${token}/join`, {
+      method: 'POST',
+    });
+  }
+
+  async cancelInvite(token: string): Promise<ApiResponse<void>> {
+    return this.request<void>(`/invite/${token}`, {
+      method: 'DELETE',
+    });
+  }
 }
 
 export const apiClient = new ApiClient();
 export default ApiClient;
 
 // Export types
-export type { Server, Phone, UserSipConfig, SipAccount, AuthResponse, ApiResponse, UserPhone };
+export type { Server, Phone, UserSipConfig, SipAccount, AuthResponse, ApiResponse, UserPhone, InviteLink, InviteInfo, JoinInviteResponse };

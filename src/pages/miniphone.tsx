@@ -1,21 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
+import { useSearchParams } from 'next/navigation';
 import { setSipAccounts, setSelectedAccount, setUserPhones } from '@/entities/WebRtc/model/slice';
 import store, { RootState } from '@/app/store';
-import { useAuth } from '@/hooks/useAuth'
-import { apiClient } from '@/lib/api'
+import { useAuth } from '@/hooks/useAuth';
+import { apiClient } from '@/lib/api';
 import { useSelector } from 'react-redux';
 import AudioButton from '@/shared/ui/AudioButton/audio-button';
-
-interface InitDataUnsafe {
-  user?: {
-    id: number;
-    is_bot?: boolean;
-    first_name: string;
-    last_name?: string;
-    username?: string;
-  };
-}
+import InviteManager from '@/widgets/InviteManager/invite-manager';
+import { getSipServiceInstance } from '@/entities/WebRtc/services/sipServiceInstance';
+import { useInviteJoin } from '@/features/InviteJoin/model/useInviteJoin';
+import { AuthErrorScreen } from '@/features/AuthError/ui/AuthErrorScreen';
+import { AlertProvider } from '@/shared/lib/hooks/useAlert';
+import { AlertContainer } from '@/shared/lib/AlertContainer';
+import { setInviteStatus } from '@/entities/WebRtc/model/slice';
 
 // Динамический импорт для предотвращения SSR ошибок
 const DialerTelegram = dynamic(() => import('@/widgets/Dialer/dialer-telegram'), {
@@ -24,26 +22,84 @@ const DialerTelegram = dynamic(() => import('@/widgets/Dialer/dialer-telegram'),
 });
 
 const MiniPhone = () => {
-  const { user, isAuthenticated, isLoading, loginWithTelegram } = useAuth()
-  const [isClient, setIsClient] = useState(false)
-  const [authError, setAuthError] = useState<string | null>(null)
+  const { user, isAuthenticated, isLoading, loginWithTelegram } = useAuth();
+  const searchParams = useSearchParams();
+  const [isClient, setIsClient] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [attemptedAuth, setAttemptedAuth] = useState(false);
-  const sessionState = useSelector((state: RootState) => state.sip.sessionState);
-  const userPhones = useSelector((state: RootState) => state.sip.userPhones);
+  
+  const inviteToken = useSelector((state: RootState) => state.sip.inviteToken);
+  const callMode = useSelector((state: RootState) => state.sip.callMode);
+  const inviteStatus = useSelector((state: RootState) => state.sip.inviteStatus);
+  const callPartner = useSelector((state: RootState) => state.sip.callPartner);
+  const selectedAccount = useSelector((state: RootState) => state.sip.selectedAccount);
+  const sipAccounts = useSelector((state: RootState) => state.sip.sipAccounts);
 
-  // Предотвращаем ошибку гидратации
+  const { joinInvite } = useInviteJoin(isAuthenticated, user, sipAccounts);
+
   useEffect(() => {
-    setIsClient(true)
-  }, [])
+    setIsClient(true);
+  }, []);
 
-  // Аутентификация через Telegram (однократная попытка)
+  // Обработка invite параметра
+  useEffect(() => {
+    if (!isClient) return;
+    
+    const inviteParam = searchParams?.get('invite');
+    const pendingInvite = localStorage.getItem('pending_invite');
+    
+    if (inviteParam && inviteParam !== inviteToken && isAuthenticated && user) {
+      localStorage.removeItem('pending_invite');
+      joinInvite(inviteParam);
+    } else if (pendingInvite && isAuthenticated && user && !inviteParam) {
+      localStorage.removeItem('pending_invite');
+      joinInvite(pendingInvite);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isClient, searchParams, isAuthenticated, inviteToken, user]);
+
+  // Автоматический звонок когда оба участника готовы
+  useEffect(() => {
+    if (
+      callMode === 'invite' &&
+      inviteStatus === 'ready' &&
+      callPartner &&
+      selectedAccount &&
+      callPartner.sip_username
+    ) {
+      initiateInviteCall();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inviteStatus, callPartner?.sip_username, selectedAccount?.id, callMode]);
+
+  const initiateInviteCall = async () => {
+    if (!callPartner?.sip_username || !selectedAccount) return;
+
+    try {
+      store.dispatch(setInviteStatus('connecting'));
+      
+      const sipService = getSipServiceInstance();
+      if (!sipService) {
+        throw new Error('SIP service not initialized');
+      }
+
+      const stateListener = (state: string) => {
+        store.dispatch(setInviteStatus(state === 'Established' ? 'active' : 'connecting'));
+      };
+
+      await sipService.makeCallToSipAccount(callPartner.sip_username, stateListener);
+    } catch (err) {
+      console.error('Failed to initiate invite call:', err);
+    }
+  };
+
+  // Аутентификация через Telegram
   useEffect(() => {
     if (isClient && !isAuthenticated && !isLoading && !attemptedAuth) {
       const handleTelegramAuth = async () => {
         if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
           const tg = window.Telegram.WebApp;
           let initData = tg.initData;
-          // dev mode
           if (process.env.NODE_ENV === 'development') {
             const searchParams = new URLSearchParams(window.location.search);
             initData = searchParams.get('user') as string;
@@ -67,36 +123,24 @@ const MiniPhone = () => {
         }
       };
 
-      // помечаем, что попытка выполнена, чтобы не зациклиться на 403
       setAttemptedAuth(true);
       handleTelegramAuth();
     }
   }, [isClient, isAuthenticated, isLoading, attemptedAuth, loginWithTelegram]);
 
+  // Инициализация Telegram Web App
   useEffect(() => {
-    // Инициализация Telegram Web App (только после успешной аутентификации)
     if (isAuthenticated && typeof window !== 'undefined' && window.Telegram?.WebApp) {
       const tg = window.Telegram.WebApp;
 
       try {
-        // Расширяем приложение на весь экран
-        if (tg.expand) {
-          tg.expand();
-        }
-
-        // Включаем кнопку закрытия (если поддерживается)
-        if (tg.enableClosingConfirmation) {
-          tg.enableClosingConfirmation();
-        }
-
-        // Настраиваем главную кнопку
+        if (tg.expand) tg.expand();
+        if (tg.enableClosingConfirmation) tg.enableClosingConfirmation();
         if (tg.MainButton) {
           tg.MainButton.setText('📞 Позвонить');
           tg.MainButton.show();
-          tg.MainButton.disable(); // Изначально отключена
+          tg.MainButton.disable();
         }
-
-        // Запрашиваем доступ к микрофону (если поддерживается)
         if (tg.requestWriteAccess) {
           tg.requestWriteAccess((granted) => {
             if (granted) {
@@ -108,52 +152,30 @@ const MiniPhone = () => {
               }
             }
           });
-        } else {
-          console.log('⚠️ requestWriteAccess not supported in this Telegram version');
-          // Попробуем запросить доступ через WebRTC API
-          if (navigator.mediaDevices?.getUserMedia) {
-            navigator.mediaDevices.getUserMedia({ audio: true })
-              .then(() => console.log('✅ Microphone access granted via WebRTC'))
-              .catch(() => console.log('❌ Microphone access denied via WebRTC'));
-          }
+        } else if (navigator.mediaDevices?.getUserMedia) {
+          navigator.mediaDevices.getUserMedia({ audio: true })
+            .then(() => console.log('✅ Microphone access granted via WebRTC'))
+            .catch(() => console.log('❌ Microphone access denied via WebRTC'));
         }
-
-        // Обработка событий (если поддерживается)
-        if (tg.onEvent) {
-          tg.onEvent('viewportChanged', () => {
-            console.log('Viewport changed:', tg.viewportHeight);
-          });
-        }
-
-        console.log('✅ Telegram Web App initialized');
-        console.log('User:', tg.initDataUnsafe?.user);
-        console.log('Platform:', tg.platform);
-        console.log('Version:', tg.version);
-
       } catch (error) {
         console.error('❌ Error initializing Telegram Web App:', error);
       }
     }
   }, [isAuthenticated]);
 
+  // Загрузка данных пользователя
   useEffect(() => {
-    // Загружаем SIP аккаунты и телефоны пользователя из API
     const loadUserData = async () => {
       if (!isAuthenticated) return;
 
       try {
-        // Загружаем SIP аккаунты
         console.log('📡 Loading SIP accounts...');
         const sipResponse = await apiClient.getSipAccounts();
 
         if (sipResponse.success && sipResponse.data) {
           const accounts = (sipResponse.data as any).accounts || [];
           console.log('✅ SIP accounts loaded:', accounts);
-
-          // Сохраняем все аккаунты в store
           store.dispatch(setSipAccounts(accounts));
-
-          // Выбираем первый активный аккаунт
           const activeAccount = accounts.find((acc: any) => acc.is_active);
           if (activeAccount) {
             store.dispatch(setSelectedAccount(activeAccount));
@@ -163,15 +185,12 @@ const MiniPhone = () => {
           console.error('❌ Failed to load SIP accounts:', sipResponse.error);
         }
 
-        // Загружаем телефоны пользователя
         console.log('📱 Loading user phones...');
         const phonesResponse = await apiClient.getUserPhones();
 
         if (phonesResponse.success && phonesResponse.data) {
           const phones = phonesResponse.data.phones || [];
           console.log('✅ User phones loaded:', phones);
-
-          // Сохраняем телефоны в store
           store.dispatch(setUserPhones(phones));
         } else {
           console.error('❌ Failed to load user phones:', phonesResponse.error);
@@ -184,7 +203,6 @@ const MiniPhone = () => {
     loadUserData();
   }, [isAuthenticated]);
 
-  // Показываем загрузку
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4 flex items-center justify-center">
@@ -196,84 +214,21 @@ const MiniPhone = () => {
     );
   }
 
-  // Показываем ошибку аутентификации
   if (authError) {
-    const handleRegistrationRequest = async () => {
-      try {
-        let initDataUnsafe: InitDataUnsafe | undefined;
-        if (typeof window !== 'undefined' && window.Telegram?.WebApp?.initDataUnsafe) {
-          initDataUnsafe = window.Telegram.WebApp.initDataUnsafe;
-        }
-        if (process.env.NODE_ENV === 'development') {
-          const searchParams = new URLSearchParams(window.location.search);
-          const obj = Object.fromEntries(searchParams.entries());
-          initDataUnsafe = JSON.parse(JSON.stringify(obj)) as InitDataUnsafe;
-        }
-
-        if (initDataUnsafe?.user) {
-          const u = initDataUnsafe.user;
-          const payload = { telegram_id: String(u.id), username: u.username };
-          const res = await fetch('/api/auth/request-registration', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-          });
-          if (res.ok) {
-            alert('Заявка отправлена. Мы свяжемся с вами после одобрения.');
-          } else {
-            const data = await res.json().catch(() => ({}));
-            alert(`Не удалось отправить заявку: ${data.error || res.status}`);
-          }
-        } else {
-          alert('Нет данных Telegram для подачи заявки');
-        }
-      } catch (e) {
-        alert('Ошибка сети при отправке заявки');
-      }
-    };
-
-    const handleRetryAuth = () => {
-      // сбрасываем ошибку и разрешаем повторную попытку авторизации
-      setAuthError(null);
-      setAttemptedAuth(false);
-    };
     return (
-      <div className="min-h-screen bg-gradient-to-br from-red-50 to-pink-100 p-4 flex items-center justify-center">
-        <div className="max-w-md mx-auto text-center">
-          <div className="bg-white rounded-2xl shadow-lg p-8">
-            <div className="text-6xl mb-4">🔒</div>
-            <h1 className="text-2xl font-bold text-gray-800 mb-2">
-              Доступ запрещен
-            </h1>
-            <p className="text-gray-600 mb-6">
-              {authError}
-            </p>
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
-              <p className="text-sm text-red-700">
-                Для доступа к приложению необходимо быть зарегистрированным пользователем Telegram.
-              </p>
-            </div>
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <button
-                onClick={handleRetryAuth}
-                className="mt-2 px-6 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800"
-              >
-                Повторить проверку
-              </button>
-              <button
-                onClick={handleRegistrationRequest}
-                className="mt-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
-                Заявка на регистрацию
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+      <AlertProvider>
+        <AuthErrorScreen
+          authError={authError}
+          onRetry={() => {
+            setAuthError(null);
+            setAttemptedAuth(false);
+          }}
+        />
+        <AlertContainer />
+      </AlertProvider>
     );
   }
 
-  // Показываем основное приложение только для аутентифицированных пользователей
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4 flex items-center justify-center">
@@ -286,46 +241,67 @@ const MiniPhone = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <div className="max-w-md mx-auto">
-        <div className="text-center mb-6">
-          <h1 className="text-2xl font-bold text-gray-800 mb-2">
-            📞 MiniPhone
-          </h1>
-          <p className="text-sm text-gray-600">
-            SIP телефония в Telegram
-          </p>
+    <AlertProvider>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+        <div className="max-w-md mx-auto">
+          <div className="text-center mb-6">
+            <h1 className="text-2xl font-bold text-gray-800 mb-2">
+              📞 MiniPhone
+            </h1>
+            <p className="text-sm text-gray-600">
+              SIP телефония в Telegram
+            </p>
 
-          {user && (
-            <div className="mt-3 p-3 bg-white rounded-lg shadow-sm">
-              <p className="text-sm font-medium text-gray-700">
-                👤 {user.first_name} {user.last_name || ''}
-              </p>
-              {user.username && (
-                <p className="text-xs text-gray-500">
-                  @{user.username}
+            {user && (
+              <div className="mt-3 p-3 bg-white rounded-lg shadow-sm">
+                <p className="text-sm font-medium text-gray-700">
+                  👤 {user.first_name} {user.last_name || ''}
                 </p>
-              )}
-              <p className="text-xs text-green-600 mt-1">
-                ✅ Аутентифицирован
+                {user.username && (
+                  <p className="text-xs text-gray-500">
+                    @{user.username}
+                  </p>
+                )}
+                <p className="text-xs text-green-600 mt-1">
+                  ✅ Аутентифицирован
+                </p>
+              </div>
+            )}
+          </div>
+
+          {callMode === 'manual' && <InviteManager />}
+
+          {callMode === 'invite' && inviteStatus === 'waiting' && (
+            <div className="mb-4 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+              <p className="text-yellow-800 text-sm">
+                ⏳ Ожидание подключения второго участника...
               </p>
             </div>
           )}
+          
+          {callMode === 'invite' && inviteStatus === 'connecting' && (
+            <div className="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="flex items-center justify-center">
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mr-2"></div>
+                <span className="text-blue-700 text-sm">Подключение...</span>
+              </div>
+            </div>
+          )}
+
+          <DialerTelegram />
+
+          <div className="mt-6 text-center">
+            <p className="text-xs text-gray-500">
+              Powered by SIP.js & Telegram Web Apps
+            </p>
+          </div>
         </div>
 
-        <DialerTelegram />
-
-        <div className="mt-6 text-center">
-          <p className="text-xs text-gray-500">
-            Powered by SIP.js & Telegram Web Apps
-          </p>
-        </div>
+        <AudioButton />
       </div>
-
-      {/* Кнопка для разблокировки звука на мобильных */}
-      <AudioButton />
-    </div>
+      <AlertContainer />
+    </AlertProvider>
   );
-}
+};
 
 export default MiniPhone;

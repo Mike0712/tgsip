@@ -110,6 +110,42 @@ class SipService {
       console.log($e, 'err');
     }
   }
+
+  async makeCallToSipAccount(sipUsername: string, listener: (state: string) => void) {
+    const target = UserAgent.makeURI(`sip:${sipUsername}@${this.host}`);
+    
+    try {
+      // Запрашиваем микрофон ДО звонка (критично для мобильных)
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        console.log('🎤 Microphone access granted');
+        // Останавливаем стрим, SIP.js создаст свой
+        stream.getTracks().forEach(track => track.stop());
+      } catch (micError) {
+        console.error('❌ Microphone access denied:', micError);
+        alert('Для звонка необходим доступ к микрофону');
+        return;
+      }
+
+      if (this.userAgent instanceof UserAgent && target instanceof URI) {
+        this.session = new Inviter(this.userAgent, target, {
+          sessionDescriptionHandlerOptions: {
+            constraints: { audio: true, video: false }
+          }
+        });
+        if (this.session instanceof Session) {
+          this.session.stateChange.addListener((state: string) => {
+            this.listenSessionState(state);
+            listener(state);
+          });
+          console.log(`📞 Calling SIP account: ${sipUsername}`);
+          this.session.invite();
+        }
+      }
+    } catch ($e) {
+      console.error('❌ Error making call to SIP account:', $e);
+    }
+  }
   answer() {
     if (this.session instanceof Invitation) {
       this.session.stateChange.addListener((state: string) => {
