@@ -46,7 +46,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           // Создаем фиктивные данные для dev режима
           auth_date = String(Math.floor(Date.now() / 1000));
           hash = 'dev-mode-hash';
-          console.log('✅ Dev mode: parsed user from JSON:', { userId: parsedUser.id });
+          if (parsedUser) {
+            console.log('✅ Dev mode: parsed user from JSON:', { userId: parsedUser.id });
+          }
         }
       } catch {
         // Если не JSON, пробуем как URLSearchParams (как в production)

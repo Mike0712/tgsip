@@ -54,7 +54,7 @@ const InviteManager = () => {
               }));
             }
 
-            if (ready_to_call && inviteStatus !== 'ready') {
+            if (ready_to_call) {
               dispatch(setInviteStatus('ready'));
             }
           }

@@ -1,6 +1,4 @@
 import { useCallback } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
-import { RootState } from '@/app/store';
 import { apiClient } from '@/lib/api';
 import {
   setSipAccounts,
@@ -21,8 +19,6 @@ export const useInviteJoin = (
   user: { telegram_id: string } | null,
   sipAccounts: any[]
 ): UseInviteJoinReturn => {
-  const dispatch = useDispatch();
-
   const joinInvite = useCallback(async (token: string) => {
     try {
       store.dispatch(setInviteToken(token));
@@ -83,7 +79,7 @@ export const useInviteJoin = (
       console.error('Failed to join invite:', err);
       store.dispatch(setInviteStatus('idle'));
     }
-  }, [isAuthenticated, user, sipAccounts, dispatch]);
+  }, [isAuthenticated, user, sipAccounts]);
 
   return {
     joinInvite,
