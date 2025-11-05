@@ -64,7 +64,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (isProduction && botToken) {
       const dataForValidation: Record<string, string> = {};
       Array.from(urlParams.entries()).forEach(([key, value]) => {
-        if (key !== 'hash' && value) {
+        // Исключаем hash и signature из данных для валидации
+        // signature - это отдельное поле, которое не должно включаться в строку для проверки
+        if (key !== 'hash' && key !== 'signature' && value) {
           dataForValidation[key] = value;
         }
       });
