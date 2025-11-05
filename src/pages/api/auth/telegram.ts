@@ -62,24 +62,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const isProduction = process.env.NODE_ENV === 'production';
     
     if (isProduction && botToken) {
-      const dataForValidation: Record<string, string> = {};
-      Array.from(urlParams.entries()).forEach(([key, value]) => {
-        // Исключаем hash и signature из данных для валидации
-        // signature - это отдельное поле, которое не должно включаться в строку для проверки
-        if (key !== 'hash' && key !== 'signature' && value) {
-          dataForValidation[key] = value;
+      // Парсим initData вручную, чтобы сохранить оригинальные значения
+      // Telegram может отправлять URL-encoded значения
+      const params: Record<string, string> = {};
+      const pairs = initData.split('&');
+      for (const pair of pairs) {
+        const [key, value] = pair.split('=');
+        if (key && value && key !== 'hash' && key !== 'signature') {
+          params[key] = decodeURIComponent(value);
         }
-      });
+      }
+      
       console.log('🔐 Validating Telegram signature in production...', {
         hasBotToken: !!botToken,
-        dataKeys: Object.keys(dataForValidation),
+        dataKeys: Object.keys(params),
         hash: hash ? 'present' : 'missing'
       });
       
-      const isValid = validateTelegramData({ ...dataForValidation, hash }, botToken);
+      const isValid = validateTelegramData({ ...params, hash }, botToken);
       if (!isValid) {
         console.error('❌ Telegram signature validation failed', {
-          dataKeys: Object.keys(dataForValidation),
+          dataKeys: Object.keys(params),
           hash,
           hasBotToken: !!botToken
         });

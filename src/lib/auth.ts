@@ -96,8 +96,8 @@ export function validateTelegramData(data: any, botToken: string): boolean {
     hasBotToken: !!botToken,
   });
   
-  // Создаем секретный ключ
-  const secretKey = crypto.createHash('sha256').update(botToken).digest();
+  // Создаем секретный ключ (botToken + 'WebAppData')
+  const secretKey = crypto.createHash('sha256').update(botToken + 'WebAppData').digest();
   
   // Создаем хеш
   const hmac = crypto.createHmac('sha256', secretKey);
@@ -111,6 +111,7 @@ export function validateTelegramData(data: any, botToken: string): boolean {
       calculated: calculatedHash.substring(0, 20) + '...',
       received: hash.substring(0, 20) + '...',
       dataCheckStringLength: dataCheckString.length,
+      fullDataCheckString: dataCheckString,
     });
   } else {
     console.log('✅ Hash matches');
