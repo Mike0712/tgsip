@@ -1,4 +1,3 @@
-// src/pages/api/auth/telegram.ts
 import { NextApiRequest, NextApiResponse } from 'next';
 import { userService, sessionService } from '../../../lib/database';
 import { createToken, validateTelegramData } from '../../../lib/auth';

@@ -1,4 +1,3 @@
-// src/database/migrations/003_create_sip_accounts_table.js
 exports.up = function(knex) {
   return knex.schema.createTable('sip_accounts', function(table) {
     table.increments('id').primary();

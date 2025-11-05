@@ -1,4 +1,3 @@
-// src/pages/api/auth/logout.ts
 import { NextApiRequest, NextApiResponse } from 'next';
 import jwt from 'jsonwebtoken';
 

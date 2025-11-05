@@ -1,4 +1,3 @@
-// 005_create_server_and_phones_tables.js
 exports.up = async function up(knex) {
     await knex.transaction(async (trx) => {
       await trx.schema.createTable('servers', (t) => {

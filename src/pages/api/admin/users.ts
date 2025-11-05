@@ -1,4 +1,3 @@
-// src/pages/api/admin/users.ts
 import { NextApiRequest, NextApiResponse } from 'next';
 import { userService } from '../../../lib/database';
 import { authenticateSession } from '../../../lib/auth';

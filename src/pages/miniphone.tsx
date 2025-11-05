@@ -7,6 +7,16 @@ import { apiClient } from '@/lib/api'
 import { useSelector } from 'react-redux';
 import AudioButton from '@/shared/ui/AudioButton/audio-button';
 
+interface InitDataUnsafe {
+  user?: {
+    id: number;
+    is_bot?: boolean;
+    first_name: string;
+    last_name?: string;
+    username?: string;
+  };
+}
+
 // Динамический импорт для предотвращения SSR ошибок
 const DialerTelegram = dynamic(() => import('@/widgets/Dialer/dialer-telegram'), {
   ssr: false,
@@ -20,24 +30,28 @@ const MiniPhone = () => {
   const [attemptedAuth, setAttemptedAuth] = useState(false);
   const sessionState = useSelector((state: RootState) => state.sip.sessionState);
   const userPhones = useSelector((state: RootState) => state.sip.userPhones);
-  
+
   // Предотвращаем ошибку гидратации
   useEffect(() => {
     setIsClient(true)
   }, [])
-  
+
   // Аутентификация через Telegram (однократная попытка)
   useEffect(() => {
     if (isClient && !isAuthenticated && !isLoading && !attemptedAuth) {
       const handleTelegramAuth = async () => {
         if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
           const tg = window.Telegram.WebApp;
-          const initData = tg.initData;
-          
+          let initData = tg.initData;
+          // dev mode
+          if (process.env.NODE_ENV === 'development') {
+            const searchParams = new URLSearchParams(window.location.search);
+            initData = searchParams.get('user') as string;
+          }
           if (initData) {
             console.log('🔐 Attempting Telegram authentication...');
             const result = await loginWithTelegram(initData);
-            
+
             if (!result.success) {
               setAuthError(result.error || 'Ошибка аутентификации');
               console.error('❌ Authentication failed:', result.error);
@@ -63,25 +77,25 @@ const MiniPhone = () => {
     // Инициализация Telegram Web App (только после успешной аутентификации)
     if (isAuthenticated && typeof window !== 'undefined' && window.Telegram?.WebApp) {
       const tg = window.Telegram.WebApp;
-      
+
       try {
         // Расширяем приложение на весь экран
         if (tg.expand) {
           tg.expand();
         }
-        
+
         // Включаем кнопку закрытия (если поддерживается)
         if (tg.enableClosingConfirmation) {
           tg.enableClosingConfirmation();
         }
-        
+
         // Настраиваем главную кнопку
         if (tg.MainButton) {
           tg.MainButton.setText('📞 Позвонить');
           tg.MainButton.show();
           tg.MainButton.disable(); // Изначально отключена
         }
-        
+
         // Запрашиваем доступ к микрофону (если поддерживается)
         if (tg.requestWriteAccess) {
           tg.requestWriteAccess((granted) => {
@@ -103,19 +117,19 @@ const MiniPhone = () => {
               .catch(() => console.log('❌ Microphone access denied via WebRTC'));
           }
         }
-        
+
         // Обработка событий (если поддерживается)
         if (tg.onEvent) {
           tg.onEvent('viewportChanged', () => {
             console.log('Viewport changed:', tg.viewportHeight);
           });
         }
-        
+
         console.log('✅ Telegram Web App initialized');
         console.log('User:', tg.initDataUnsafe?.user);
         console.log('Platform:', tg.platform);
         console.log('Version:', tg.version);
-        
+
       } catch (error) {
         console.error('❌ Error initializing Telegram Web App:', error);
       }
@@ -131,14 +145,14 @@ const MiniPhone = () => {
         // Загружаем SIP аккаунты
         console.log('📡 Loading SIP accounts...');
         const sipResponse = await apiClient.getSipAccounts();
-        
+
         if (sipResponse.success && sipResponse.data) {
           const accounts = (sipResponse.data as any).accounts || [];
           console.log('✅ SIP accounts loaded:', accounts);
-          
+
           // Сохраняем все аккаунты в store
           store.dispatch(setSipAccounts(accounts));
-          
+
           // Выбираем первый активный аккаунт
           const activeAccount = accounts.find((acc: any) => acc.is_active);
           if (activeAccount) {
@@ -152,11 +166,11 @@ const MiniPhone = () => {
         // Загружаем телефоны пользователя
         console.log('📱 Loading user phones...');
         const phonesResponse = await apiClient.getUserPhones();
-        
+
         if (phonesResponse.success && phonesResponse.data) {
           const phones = phonesResponse.data.phones || [];
           console.log('✅ User phones loaded:', phones);
-          
+
           // Сохраняем телефоны в store
           store.dispatch(setUserPhones(phones));
         } else {
@@ -186,8 +200,18 @@ const MiniPhone = () => {
   if (authError) {
     const handleRegistrationRequest = async () => {
       try {
-        if (typeof window !== 'undefined' && window.Telegram?.WebApp?.initDataUnsafe?.user) {
-          const u = window.Telegram.WebApp.initDataUnsafe.user;
+        let initDataUnsafe: InitDataUnsafe | undefined;
+        if (typeof window !== 'undefined' && window.Telegram?.WebApp?.initDataUnsafe) {
+          initDataUnsafe = window.Telegram.WebApp.initDataUnsafe;
+        }
+        if (process.env.NODE_ENV === 'development') {
+          const searchParams = new URLSearchParams(window.location.search);
+          const obj = Object.fromEntries(searchParams.entries());
+          initDataUnsafe = JSON.parse(JSON.stringify(obj)) as InitDataUnsafe;
+        }
+
+        if (initDataUnsafe?.user) {
+          const u = initDataUnsafe.user;
           const payload = { telegram_id: String(u.id), username: u.username };
           const res = await fetch('/api/auth/request-registration', {
             method: 'POST',
@@ -271,7 +295,7 @@ const MiniPhone = () => {
           <p className="text-sm text-gray-600">
             SIP телефония в Telegram
           </p>
-          
+
           {user && (
             <div className="mt-3 p-3 bg-white rounded-lg shadow-sm">
               <p className="text-sm font-medium text-gray-700">
@@ -288,16 +312,16 @@ const MiniPhone = () => {
             </div>
           )}
         </div>
-        
+
         <DialerTelegram />
-        
+
         <div className="mt-6 text-center">
           <p className="text-xs text-gray-500">
             Powered by SIP.js & Telegram Web Apps
           </p>
         </div>
       </div>
-      
+
       {/* Кнопка для разблокировки звука на мобильных */}
       <AudioButton />
     </div>

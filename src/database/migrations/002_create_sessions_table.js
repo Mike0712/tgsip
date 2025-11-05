@@ -1,4 +1,3 @@
-// src/database/migrations/002_create_sessions_table.js
 exports.up = function(knex) {
   return knex.schema.createTable('sessions', function(table) {
     table.increments('id').primary();

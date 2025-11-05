@@ -1,4 +1,3 @@
-// src/pages/api/auth/check-user.ts
 import { NextApiRequest, NextApiResponse } from 'next';
 import { userService } from '../../../lib/database';
 
