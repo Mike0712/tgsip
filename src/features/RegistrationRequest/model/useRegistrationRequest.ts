@@ -12,13 +12,13 @@ interface InitDataUnsafe {
 }
 
 interface UseRegistrationRequestReturn {
-  submitRegistrationRequest: () => Promise<void>;
+  submitRegistrationRequest: () => Promise<boolean>; // возвращает true при успехе
 }
 
 export const useRegistrationRequest = (
   showAlert: (title: string, description?: string, variant?: 'default' | 'success' | 'error' | 'warning') => void
 ): UseRegistrationRequestReturn => {
-  const submitRegistrationRequest = useCallback(async () => {
+  const submitRegistrationRequest = useCallback(async (): Promise<boolean> => {
     try {
       let initDataUnsafe: InitDataUnsafe | undefined;
       
@@ -43,7 +43,7 @@ export const useRegistrationRequest = (
               parseError instanceof Error ? parseError.message : 'Unknown error',
               'error'
             );
-            return;
+            return false;
           }
         }
       }
@@ -54,7 +54,7 @@ export const useRegistrationRequest = (
           'Нет данных Telegram для подачи заявки',
           'error'
         );
-        return;
+        return false;
       }
 
       const u = initDataUnsafe.user;
@@ -67,11 +67,7 @@ export const useRegistrationRequest = (
       });
       
       if (res.ok) {
-        showAlert(
-          'Заявка отправлена',
-          'Мы свяжемся с вами после одобрения.',
-          'success'
-        );
+        return true; // Успех - открываем модальное окно регистрации
       } else {
         const data = await res.json().catch(() => ({}));
         showAlert(
@@ -79,6 +75,7 @@ export const useRegistrationRequest = (
           data.error || `Статус: ${res.status}`,
           'error'
         );
+        return false;
       }
     } catch (e) {
       console.error('❌ Registration request error:', e);
@@ -87,6 +84,7 @@ export const useRegistrationRequest = (
         e instanceof Error ? e.message : 'Unknown error',
         'error'
       );
+      return false;
     }
   }, [showAlert]);
 

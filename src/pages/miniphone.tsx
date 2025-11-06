@@ -37,6 +37,25 @@ const MiniPhone = () => {
 
   const { joinInvite } = useInviteJoin(isAuthenticated, user, sipAccounts);
 
+  const handleRegistrationSuccess = async (token: string) => {
+    // Сохраняем токен
+    localStorage.setItem('auth_token', token);
+    apiClient.setToken(token);
+    
+    // Верифицируем токен и обновляем состояние
+    try {
+      const response = await apiClient.verifyToken();
+      if (response.success && response.data) {
+        // Перезагружаем страницу для обновления состояния
+        window.location.reload();
+      } else {
+        console.error('Failed to verify token after registration');
+      }
+    } catch (error) {
+      console.error('Error verifying token:', error);
+    }
+  };
+
   useEffect(() => {
     setIsClient(true);
   }, []);
@@ -223,6 +242,7 @@ const MiniPhone = () => {
             setAuthError(null);
             setAttemptedAuth(false);
           }}
+          onRegistrationSuccess={handleRegistrationSuccess}
         />
         <AlertContainer />
       </AlertProvider>

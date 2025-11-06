@@ -1,15 +1,49 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useRegistrationRequest } from '@/features/RegistrationRequest/model/useRegistrationRequest';
+import { useRegistration } from '@/features/Registration/model/useRegistration';
 import { useAlert } from '@/shared/lib/hooks/useAlert';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/shared/ui/Alert/alert';
 
 interface AuthErrorScreenProps {
   authError: string;
   onRetry: () => void;
+  onRegistrationSuccess?: (token: string) => void;
 }
 
-export const AuthErrorScreen: React.FC<AuthErrorScreenProps> = ({ authError, onRetry }) => {
+export const AuthErrorScreen: React.FC<AuthErrorScreenProps> = ({ authError, onRetry, onRegistrationSuccess }) => {
   const { showAlert } = useAlert();
   const { submitRegistrationRequest } = useRegistrationRequest(showAlert);
+  const { register, isLoading: isRegistering } = useRegistration();
+  const [showRegistrationModal, setShowRegistrationModal] = useState(false);
+  const [firstName, setFirstName] = useState('');
+  const [firstNameError, setFirstNameError] = useState('');
+
+  const handleSubmitRequest = async () => {
+    const success = await submitRegistrationRequest();
+    if (success) {
+      setShowRegistrationModal(true);
+    }
+  };
+
+  const handleRegister = async () => {
+    // Валидация
+    if (!firstName.trim()) {
+      setFirstNameError('Имя обязательно для заполнения');
+      return;
+    }
+    setFirstNameError('');
+
+    const result = await register(firstName.trim());
+    if (result.success && result.token) {
+      showAlert('Регистрация успешна', 'Добро пожаловать!', 'success');
+      setShowRegistrationModal(false);
+      if (onRegistrationSuccess) {
+        onRegistrationSuccess(result.token);
+      }
+    } else {
+      showAlert('Ошибка регистрации', result.error || 'Не удалось зарегистрироваться', 'error');
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-red-50 to-pink-100 p-4 flex items-center justify-center">
@@ -35,7 +69,7 @@ export const AuthErrorScreen: React.FC<AuthErrorScreenProps> = ({ authError, onR
               Повторить проверку
             </button>
             <button
-              onClick={submitRegistrationRequest}
+              onClick={handleSubmitRequest}
               className="mt-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
             >
               Заявка на регистрацию
@@ -43,6 +77,58 @@ export const AuthErrorScreen: React.FC<AuthErrorScreenProps> = ({ authError, onR
           </div>
         </div>
       </div>
+
+      {/* Модальное окно регистрации */}
+      <Dialog open={showRegistrationModal} onOpenChange={setShowRegistrationModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Регистрация</DialogTitle>
+            <DialogDescription className="mt-2">
+              Пожалуйста, введите ваше имя для завершения регистрации
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4 space-y-4">
+            <div>
+              <label htmlFor="first_name" className="block text-sm font-medium text-gray-700 mb-1">
+                Имя <span className="text-red-500">*</span>
+              </label>
+              <input
+                id="first_name"
+                type="text"
+                value={firstName}
+                onChange={(e) => {
+                  setFirstName(e.target.value);
+                  setFirstNameError('');
+                }}
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  firstNameError ? 'border-red-500' : 'border-gray-300'
+                }`}
+                placeholder="Введите ваше имя"
+                disabled={isRegistering}
+              />
+              {firstNameError && (
+                <p className="mt-1 text-sm text-red-500">{firstNameError}</p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <button
+              onClick={() => setShowRegistrationModal(false)}
+              className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+              disabled={isRegistering}
+            >
+              Отмена
+            </button>
+            <button
+              onClick={handleRegister}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={isRegistering}
+            >
+              {isRegistering ? 'Регистрация...' : 'Зарегистрироваться'}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
