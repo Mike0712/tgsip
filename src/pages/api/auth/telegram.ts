@@ -21,82 +21,68 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const { initData } = req.body;
     
-    console.log('📥 Telegram auth request received:', {
+    console.log('📥 Telegram auth request:', {
       hasInitData: !!initData,
       initDataLength: initData?.length,
-      initDataPreview: initData?.substring(0, 100),
-      isDev: process.env.NODE_ENV === 'development',
+      initDataPreview: initData?.substring(0, 200),
+      nodeEnv: process.env.NODE_ENV,
+      hasBotToken: !!process.env.TELEGRAM_BOT_TOKEN,
     });
     
     if (!initData) {
       return res.status(400).json({ error: 'Telegram init data is required' });
     }
 
-    let parsedUser: TelegramUser | null = null;
-    let auth_date: string = '';
-    let hash: string = '';
+    // Парсим данные от Telegram WebApp: важные ключи: user (JSON), auth_date, hash, query_id
+    const urlParams = new URLSearchParams(initData);
+    const userStr = urlParams.get('user');
+    const auth_date = urlParams.get('auth_date') || '';
+    const hash = urlParams.get('hash') || '';
+    const query_id = urlParams.get('query_id') || undefined;
 
-    // В dev режиме initData может быть просто JSON строкой с user
-    if (process.env.NODE_ENV === 'development') {
-      try {
-        // Пытаемся распарсить как JSON напрямую
-        const parsed = JSON.parse(initData);
-        if (parsed.id) {
-          parsedUser = parsed;
-          // Создаем фиктивные данные для dev режима
-          auth_date = String(Math.floor(Date.now() / 1000));
-          hash = 'dev-mode-hash';
-          if (parsedUser) {
-            console.log('✅ Dev mode: parsed user from JSON:', { userId: parsedUser.id });
-          }
-        }
-      } catch {
-        // Если не JSON, пробуем как URLSearchParams (как в production)
-      }
-    }
+    console.log('🔍 Parsed initData:', {
+      hasUser: !!userStr,
+      hasAuthDate: !!auth_date,
+      hasHash: !!hash,
+      hasQueryId: !!query_id,
+      authDate: auth_date,
+      userPreview: userStr?.substring(0, 100),
+    });
 
-    // Если не распарсили в dev режиме, используем стандартный формат Telegram
-    if (!parsedUser) {
-      const urlParams = new URLSearchParams(initData);
-      const userStr = urlParams.get('user');
-      auth_date = urlParams.get('auth_date') || '';
-      hash = urlParams.get('hash') || '';
-
-      console.log('🔍 Parsed initData:', {
-        hasUser: !!userStr,
-        hasAuthDate: !!auth_date,
-        hasHash: !!hash,
-        authDate: auth_date,
-      });
-
-      parsedUser = userStr ? JSON.parse(userStr) : null;
-    }
-
+    const parsedUser: TelegramUser | null = userStr ? JSON.parse(userStr) : null;
     if (!parsedUser?.id) {
-      console.error('❌ No user in initData:', { initData: initData?.substring(0, 200) });
+      console.error('❌ No user in initData');
       return res.status(401).json({ error: 'Invalid Telegram init data: no user' });
     }
 
     console.log('✅ User parsed:', { userId: parsedUser.id, username: parsedUser.username });
 
-    // Проверяем подпись (только в продакшене)
+    // Проверяем подпись (в продакшене)
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
-    if (process.env.NODE_ENV === 'production' && botToken) {
-      const urlParams = new URLSearchParams(initData);
-      const dataForValidation: Record<string, string> = {};
-      Array.from(urlParams.entries()).forEach(([key, value]) => {
-        if (key !== 'hash' && value) {
-          dataForValidation[key] = value;
+    const isProduction = process.env.NODE_ENV === 'production';
+    
+    if (isProduction && botToken) {
+      // Парсим initData вручную, чтобы сохранить оригинальные значения
+      // Telegram может отправлять URL-encoded значения
+      const params: Record<string, string> = {};
+      const pairs = initData.split('&');
+      for (const pair of pairs) {
+        const [key, value] = pair.split('=');
+        if (key && value && key !== 'hash' && key !== 'signature') {
+          params[key] = decodeURIComponent(value);
         }
-      });
+      }
+      
       console.log('🔐 Validating Telegram signature in production...', {
         hasBotToken: !!botToken,
-        dataKeys: Object.keys(dataForValidation),
+        dataKeys: Object.keys(params),
         hash: hash ? 'present' : 'missing'
       });
-      if (!validateTelegramData({ ...dataForValidation, hash }, botToken)) {
+      
+      const isValid = validateTelegramData({ ...params, hash }, botToken);
+      if (!isValid) {
         console.error('❌ Telegram signature validation failed', {
-          dataKeys: Object.keys(dataForValidation),
+          dataKeys: Object.keys(params),
           hash,
           hasBotToken: !!botToken
         });
@@ -104,13 +90,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       } else {
         console.log('✅ Telegram signature valid');
       }
+    } else if (isProduction && !botToken) {
+      console.error('❌ Production mode but TELEGRAM_BOT_TOKEN is missing');
+      return res.status(500).json({ error: 'Server configuration error' });
     }
 
-    // Проверяем время (данные не старше 24 часов) - только в production
-    if (process.env.NODE_ENV === 'production' && auth_date) {
+    // Проверяем время (данные не старше 24 часов) - только если есть auth_date
+    if (auth_date) {
       const authDate = parseInt(auth_date) * 1000;
       const now = Date.now();
       const ageInHours = (now - authDate) / (1000 * 60 * 60);
+      
       console.log('⏰ Auth date check:', {
         authDate: new Date(authDate).toISOString(),
         now: new Date(now).toISOString(),
@@ -118,17 +108,34 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         isValid: now - authDate <= 24 * 60 * 60 * 1000
       });
       
-      if (now - authDate > 24 * 60 * 60 * 1000) {
-        console.error('❌ Telegram data is too old:', { ageInHours });
+      if (isNaN(authDate) || now - authDate > 24 * 60 * 60 * 1000) {
+        console.error('❌ Telegram data is too old or invalid:', { 
+          authDate: auth_date,
+          parsedAuthDate: authDate,
+          ageInHours: ageInHours.toFixed(2),
+          isNaN: isNaN(authDate)
+        });
         return res.status(401).json({ error: 'Telegram data is too old' });
       }
+    } else if (isProduction) {
+      console.error('❌ Production mode but auth_date is missing');
+      return res.status(401).json({ error: 'Invalid Telegram init data: missing auth_date' });
     }
 
     // Проверяем существует ли пользователь в базе данных (по telegram_id)
+    console.log('🔍 Searching user in DB:', { telegramId: parsedUser.id, telegramIdType: typeof parsedUser.id });
     let user = await userService.findByTelegramId(String(parsedUser.id));
+    
+    console.log('👤 User lookup result:', { 
+      found: !!user, 
+      userId: user?.id,
+      telegramId: user?.telegram_id,
+      telegramIdType: typeof user?.telegram_id
+    });
     
     if (!user) {
       // Пользователь не найден - доступ запрещен
+      console.error('❌ User not found in database:', { telegramId: parsedUser.id });
       return res.status(403).json({ 
         success: false,
         error: 'Access denied',

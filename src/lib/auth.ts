@@ -78,19 +78,44 @@ export function validateTelegramData(data: any, botToken: string): boolean {
   const crypto = require('crypto');
   const { hash, ...userData } = data;
   
-  // Создаем строку для проверки
+  if (!hash) {
+    console.error('❌ validateTelegramData: hash is missing');
+    return false;
+  }
+  
+  // Создаем строку для проверки (важно: сортировка по алфавиту)
   const dataCheckString = Object.keys(userData)
     .sort()
     .map(key => `${key}=${userData[key]}`)
     .join('\n');
   
-  // Создаем секретный ключ
-  const secretKey = crypto.createHash('sha256').update(botToken).digest();
+  console.log('🔐 Validation data:', {
+    keys: Object.keys(userData).sort(),
+    dataCheckString: dataCheckString.substring(0, 200),
+    hash: hash.substring(0, 20) + '...',
+    hasBotToken: !!botToken,
+  });
+  
+  // Создаем секретный ключ (botToken + 'WebAppData')
+  const secretKey = crypto.createHash('sha256').update(botToken + 'WebAppData').digest();
   
   // Создаем хеш
   const hmac = crypto.createHmac('sha256', secretKey);
   hmac.update(dataCheckString);
   const calculatedHash = hmac.digest('hex');
   
-  return calculatedHash === hash;
+  const isValid = calculatedHash === hash;
+  
+  if (!isValid) {
+    console.error('❌ Hash mismatch:', {
+      calculated: calculatedHash.substring(0, 20) + '...',
+      received: hash.substring(0, 20) + '...',
+      dataCheckStringLength: dataCheckString.length,
+      fullDataCheckString: dataCheckString,
+    });
+  } else {
+    console.log('✅ Hash matches');
+  }
+  
+  return isValid;
 }
