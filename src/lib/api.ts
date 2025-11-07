@@ -114,6 +114,38 @@ interface UserSummary {
   photo_url?: string;
 }
 
+interface BridgeParticipant {
+  id: string;
+  bridge_id: string;
+  type: 'user' | 'sip' | 'phone' | 'external';
+  role: 'initiator' | 'participant';
+  reference: string;
+  display_name?: string;
+  status: 'pending' | 'dialing' | 'joined' | 'failed' | 'left';
+  created_at: string;
+  updated_at: string;
+  metadata?: Record<string, unknown>;
+}
+
+interface BridgeSession {
+  id: string;
+  creator_id: number;
+  status: 'pending' | 'active' | 'completed' | 'failed' | 'terminated';
+  target?: string;
+  metadata?: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+interface BridgeCreateResponse {
+  bridge: BridgeSession;
+  participants: BridgeParticipant[];
+}
+
+interface BridgeParticipantsResponse {
+  participants: BridgeParticipant[];
+}
+
 class ApiClient {
   private baseUrl: string;
   private token: string | null = null;
@@ -157,13 +189,59 @@ class ApiClient {
         ...options,
         headers,
       });
+      const contentType = response.headers.get('content-type') || '';
+      let data: any = null;
 
-      const data = await response.json();
+      if (contentType.includes('application/json')) {
+        try {
+          data = await response.json();
+        } catch (parseError) {
+          const errorMessage = parseError instanceof Error ? parseError.message : 'Invalid JSON response';
+          console.error('Failed to parse JSON response:', parseError);
+          return {
+            success: false,
+            error: errorMessage,
+          };
+        }
+      } else {
+        const text = await response.text();
+        const trimmed = text.trim();
+
+        if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+          try {
+            data = JSON.parse(trimmed);
+          } catch (parseError) {
+            console.error('Failed to parse JSON-like text response:', parseError);
+            return {
+              success: false,
+              error: 'Invalid JSON response',
+            };
+          }
+        } else {
+          if (!response.ok) {
+            return {
+              success: false,
+              error: trimmed || response.statusText || 'Request failed',
+            };
+          }
+
+          console.warn('Unexpected non-JSON response from API:', {
+            endpoint,
+            status: response.status,
+            preview: trimmed.substring(0, 200),
+          });
+
+          return {
+            success: false,
+            error: 'Unexpected response format',
+          };
+        }
+      }
 
       if (!response.ok) {
         return {
           success: false,
-          error: data.error || 'Request failed',
+          error: data?.error || data?.message || response.statusText || 'Request failed',
         };
       }
 
@@ -349,10 +427,55 @@ class ApiClient {
       body: JSON.stringify(payload),
     });
   }
+
+  async createBridgeSession(payload: { target?: string; metadata?: Record<string, unknown> }): Promise<ApiResponse<BridgeCreateResponse>> {
+    return this.request<BridgeCreateResponse>('/calls/bridges', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async addBridgeParticipant(bridgeId: string, participant: {
+    type: BridgeParticipant['type'];
+    role: BridgeParticipant['role'];
+    reference: string;
+    display_name?: string;
+    metadata?: Record<string, unknown>;
+  }): Promise<ApiResponse<BridgeParticipantsResponse>> {
+    return this.request<BridgeParticipantsResponse>(`/calls/bridges/${bridgeId}/participants`, {
+      method: 'POST',
+      body: JSON.stringify(participant),
+    });
+  }
+
+  async getBridgeSession(bridgeId: string): Promise<ApiResponse<BridgeCreateResponse>> {
+    return this.request<BridgeCreateResponse>(`/calls/bridges/${bridgeId}`);
+  }
+
+  async endBridgeSession(bridgeId: string): Promise<ApiResponse<{ bridge: BridgeSession }>> {
+    return this.request<{ bridge: BridgeSession }>(`/calls/bridges/${bridgeId}`, {
+      method: 'DELETE',
+    });
+  }
 }
 
 export const apiClient = new ApiClient();
 export default ApiClient;
 
 // Export types
-export type { Server, Phone, UserSipConfig, SipAccount, AuthResponse, ApiResponse, UserPhone, InviteLink, InviteInfo, JoinInviteResponse, UserSummary };
+export type {
+  Server,
+  Phone,
+  UserSipConfig,
+  SipAccount,
+  AuthResponse,
+  ApiResponse,
+  UserPhone,
+  InviteLink,
+  InviteInfo,
+  JoinInviteResponse,
+  UserSummary,
+  BridgeParticipant,
+  BridgeSession,
+  BridgeCreateResponse,
+};

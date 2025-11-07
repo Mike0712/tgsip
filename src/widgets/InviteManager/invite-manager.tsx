@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '@/app/store';
 import { apiClient, UserSummary } from '@/lib/api';
@@ -30,6 +30,10 @@ const InviteManager = () => {
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [searchTouched, setSearchTouched] = useState(false);
+  const [botDeepLink, setBotDeepLink] = useState<string | null>(null);
+  const skipNextSearch = useRef(false);
+  const botUsername = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME;
+  const baseBotLink = botUsername ? `https://t.me/${botUsername}` : null;
 
   const buildUserLabel = (user: UserSummary) => {
     const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ').trim();
@@ -47,6 +51,12 @@ const InviteManager = () => {
 
   useEffect(() => {
     const trimmed = searchTerm.trim();
+
+    if (skipNextSearch.current) {
+      skipNextSearch.current = false;
+      setIsSearching(false);
+      return;
+    }
 
     if (!trimmed) {
       setSearchResults([]);
@@ -171,6 +181,7 @@ const InviteManager = () => {
     setSearchTerm(buildUserLabel(user));
     setSearchResults([]);
     setSearchError(null);
+    skipNextSearch.current = true;
   };
 
   const handleClearSelection = () => {
@@ -180,6 +191,7 @@ const InviteManager = () => {
     setSearchResults([]);
     setSearchError(null);
     setSearchTouched(false);
+    skipNextSearch.current = false;
   };
 
   const initiateCall = async () => {
@@ -229,6 +241,10 @@ const InviteManager = () => {
       const normalizedBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
       const link = `${normalizedBase}/miniphone?invite=${invite.token}`;
 
+      if (botUsername) {
+        setBotDeepLink(`https://t.me/${botUsername}?start=${invite.token}`);
+      }
+
       const sendResponse = await apiClient.sendInviteMessage({
         telegram_id: selectedUser.telegram_id,
         link,
@@ -257,6 +273,7 @@ const InviteManager = () => {
       const errorMessage = err instanceof Error ? err.message : 'Ошибка при создании приглашения';
       setError(errorMessage);
       dispatch(setInviteStatus('idle'));
+      setBotDeepLink(null);
       console.error('Failed to create invite:', err);
     }
   };
@@ -273,6 +290,7 @@ const InviteManager = () => {
       dispatch(resetInvite());
       setError(null);
       setInvitedUser(null);
+      setBotDeepLink(null);
     } catch (err) {
       console.error('Failed to cancel invite:', err);
     }
@@ -287,6 +305,37 @@ const InviteManager = () => {
       });
     }
   };
+
+  const copyBotDeepLink = () => {
+    if (botDeepLink) {
+      navigator.clipboard.writeText(botDeepLink).then(() => {
+        showAlert('Ссылка скопирована', 'Deep link скопирован в буфер обмена', 'success');
+      }).catch(() => {
+        showAlert('Ошибка', 'Не удалось скопировать ссылку', 'error');
+      });
+    }
+  };
+
+  const openBotDeepLink = () => {
+    if (botDeepLink && typeof window !== 'undefined') {
+      window.open(botDeepLink, '_blank', 'noopener,noreferrer');
+    }
+  };
+
+  const copyBaseBotLink = () => {
+    if (!baseBotLink) {
+      showAlert('Нужно настроить бота', 'Пропиши NEXT_PUBLIC_TELEGRAM_BOT_USERNAME, чтобы поделиться ссылкой.', 'warning');
+      return;
+    }
+
+    navigator.clipboard.writeText(baseBotLink).then(() => {
+      showAlert('Ссылка скопирована', 'Ссылка на бота скопирована в буфер обмена', 'success');
+    }).catch(() => {
+      showAlert('Ошибка', 'Не удалось скопировать ссылку', 'error');
+    });
+  };
+
+  const shouldSuggestBotLink = searchError?.includes('Ничего не нашли');
 
   if (inviteStatus === 'idle') {
     return (
@@ -338,6 +387,19 @@ const InviteManager = () => {
           </div>
           {searchError && (
             <p className="mt-2 text-xs text-red-600">{searchError}</p>
+          )}
+          {shouldSuggestBotLink && (
+            <div className="mt-3 p-3 bg-gray-50 border border-dashed border-gray-300 rounded-lg text-sm text-gray-700">
+              <p className="mb-3">
+                Похоже, пользователя ещё нет в системе. Вы можете отправить ему ссылку для вступления.
+              </p>
+              <button
+                onClick={copyBaseBotLink}
+                className="w-full px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 text-sm"
+              >
+                Скопировать ссылку на бота
+              </button>
+            </div>
           )}
           {selectedUser && !searchError && (
             <div className="mt-3 p-3 bg-blue-50 border border-blue-100 rounded-lg text-sm text-blue-700">
@@ -426,6 +488,37 @@ const InviteManager = () => {
             </button>
           </div>
         </div>
+
+        {botDeepLink && (
+          <div className="mb-3">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Приглашение в Telegram-бота:
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                readOnly
+                value={botDeepLink}
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm"
+              />
+              <button
+                onClick={copyBotDeepLink}
+                className="px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 text-sm"
+              >
+                Копировать
+              </button>
+              <button
+                onClick={openBotDeepLink}
+                className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
+              >
+                Открыть
+              </button>
+            </div>
+            <p className="mt-2 text-xs text-gray-500">
+              Если бот ещё не знаком с пользователем, отправь эту ссылку вручную — он откроет диалог с ботом и получит приглашение.
+            </p>
+          </div>
+        )}
 
         <div className="p-3 bg-blue-50 rounded-lg">
           <div className="flex items-center">

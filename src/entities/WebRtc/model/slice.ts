@@ -1,5 +1,14 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { SipAccount, UserPhone, Server, Phone, UserSipConfig, InviteLink } from '@/lib/api';
+import {
+  SipAccount,
+  UserPhone,
+  Server,
+  Phone,
+  UserSipConfig,
+  InviteLink,
+  BridgeSession,
+  BridgeParticipant,
+} from '@/lib/api';
 
 interface SipState {
   status: 'online' | 'offline';
@@ -27,6 +36,9 @@ interface SipState {
   inviteStatus: 'idle' | 'creating' | 'active' | 'waiting' | 'connecting' | 'ready';
   callPartner: { sip_username: string; telegram_id: string } | null;
   callStatus: 'idle' | 'waiting' | 'connecting' | 'active';
+  bridgeSession: BridgeSession | null;
+  bridgeStatus: 'idle' | 'creating' | 'active' | 'terminating' | 'completed' | 'failed';
+  bridgeParticipants: BridgeParticipant[];
 }
 
 const initialState: SipState = {
@@ -53,7 +65,10 @@ const initialState: SipState = {
   inviteLink: null,
   inviteStatus: 'idle',
   callPartner: null,
-  callStatus: 'idle'
+  callStatus: 'idle',
+  bridgeSession: null,
+  bridgeStatus: 'idle',
+  bridgeParticipants: [],
 };
 
 const sipSlice = createSlice({
@@ -140,6 +155,20 @@ const sipSlice = createSlice({
     setCallStatus: (state, action: PayloadAction<'idle' | 'waiting' | 'connecting' | 'active'>) => {
       state.callStatus = action.payload;
     },
+    setBridgeStatus: (state, action: PayloadAction<SipState['bridgeStatus']>) => {
+      state.bridgeStatus = action.payload;
+    },
+    setBridgeSession: (state, action: PayloadAction<BridgeSession | null>) => {
+      state.bridgeSession = action.payload;
+    },
+    setBridgeParticipants: (state, action: PayloadAction<BridgeParticipant[]>) => {
+      state.bridgeParticipants = action.payload;
+    },
+    resetBridge: (state) => {
+      state.bridgeSession = null;
+      state.bridgeStatus = 'idle';
+      state.bridgeParticipants = [];
+    },
     resetInvite: (state) => {
       state.callMode = 'manual';
       state.inviteToken = null;
@@ -176,6 +205,10 @@ export const {
   setInviteStatus,
   setCallPartner,
   setCallStatus,
+  setBridgeStatus,
+  setBridgeSession,
+  setBridgeParticipants,
+  resetBridge,
   resetInvite
 } = sipSlice.actions;
 
