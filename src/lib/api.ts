@@ -105,6 +105,15 @@ interface JoinInviteResponse {
   ready_to_call: boolean;
 }
 
+interface UserSummary {
+  id: number;
+  telegram_id: string;
+  username?: string;
+  first_name: string;
+  last_name?: string;
+  photo_url?: string;
+}
+
 class ApiClient {
   private baseUrl: string;
   private token: string | null = null;
@@ -323,10 +332,27 @@ class ApiClient {
       method: 'DELETE',
     });
   }
+
+  async searchUsers(query: string, limit = 10): Promise<ApiResponse<{ users: UserSummary[] }>> {
+    const params = new URLSearchParams({ q: query });
+
+    if (limit) {
+      params.set('limit', String(limit));
+    }
+
+    return this.request<{ users: UserSummary[] }>(`/users/search?${params.toString()}`);
+  }
+
+  async sendInviteMessage(payload: { telegram_id: string; link: string; message?: string }): Promise<ApiResponse<{ success: boolean }>> {
+    return this.request<{ success: boolean }>('/invite/send', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
 }
 
 export const apiClient = new ApiClient();
 export default ApiClient;
 
 // Export types
-export type { Server, Phone, UserSipConfig, SipAccount, AuthResponse, ApiResponse, UserPhone, InviteLink, InviteInfo, JoinInviteResponse };
+export type { Server, Phone, UserSipConfig, SipAccount, AuthResponse, ApiResponse, UserPhone, InviteLink, InviteInfo, JoinInviteResponse, UserSummary };

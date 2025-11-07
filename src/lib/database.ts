@@ -100,6 +100,28 @@ export const userService = {
 
   async findAll(): Promise<User[]> {
     return await db('users').orderBy('created_at', 'desc');
+  },
+
+  async search(query: string, limit = 10): Promise<User[]> {
+    const trimmed = query.trim();
+
+    if (!trimmed) {
+      return [];
+    }
+
+    const sanitized = trimmed.replace(/[%_]/g, '\\$&');
+    const safeLimit = Math.min(Math.max(limit ?? 10, 1), 25);
+
+    return await db('users')
+      .where((builder) => {
+        builder
+          .whereRaw('telegram_id ILIKE ?', [`%${sanitized}%`])
+          .orWhereRaw('username ILIKE ?', [`%${sanitized}%`])
+          .orWhereRaw('first_name ILIKE ?', [`%${sanitized}%`])
+          .orWhereRaw('last_name ILIKE ?', [`%${sanitized}%`]);
+      })
+      .orderBy('last_seen', 'desc')
+      .limit(safeLimit);
   }
 };
 

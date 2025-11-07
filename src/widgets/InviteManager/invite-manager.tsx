@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '@/app/store';
-import { apiClient } from '@/lib/api';
+import { apiClient, UserSummary } from '@/lib/api';
 import {
   setCallMode,
   setInviteToken,
@@ -23,10 +23,84 @@ const InviteManager = () => {
   const callPartner = useSelector((state: RootState) => state.sip.callPartner);
   const selectedAccount = useSelector((state: RootState) => state.sip.selectedAccount);
   const [error, setError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState<UserSummary[]>([]);
+  const [selectedUser, setSelectedUser] = useState<UserSummary | null>(null);
+  const [invitedUser, setInvitedUser] = useState<UserSummary | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [searchTouched, setSearchTouched] = useState(false);
+
+  const buildUserLabel = (user: UserSummary) => {
+    const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ').trim();
+    return fullName || user.username || user.telegram_id;
+  };
+
+  const buildUserMeta = (user: UserSummary) => {
+    const parts: string[] = [];
+    if (user.username) {
+      parts.push(`@${user.username}`);
+    }
+    parts.push(`ID: ${user.telegram_id}`);
+    return parts.join(' • ');
+  };
+
+  useEffect(() => {
+    const trimmed = searchTerm.trim();
+
+    if (!trimmed) {
+      setSearchResults([]);
+      setIsSearching(false);
+      setSearchError(null);
+      return;
+    }
+
+    if (trimmed.length < 2) {
+      setSearchResults([]);
+      setIsSearching(false);
+      setSearchError(searchTouched ? 'Введи минимум 2 символа' : null);
+      return;
+    }
+
+    let cancelled = false;
+    setIsSearching(true);
+    setSearchError(null);
+
+    const timeoutId = setTimeout(async () => {
+      try {
+        const response = await apiClient.searchUsers(trimmed, 8);
+        if (cancelled) return;
+
+        if (response.success && response.data) {
+          setSearchResults(response.data.users);
+          if (!response.data.users.length) {
+            setSearchError('Ничего не нашли');
+          }
+        } else {
+          setSearchResults([]);
+          setSearchError(response.error || 'Не удалось найти пользователей');
+        }
+      } catch (err) {
+        if (cancelled) return;
+        console.error('Failed to search users:', err);
+        setSearchResults([]);
+        setSearchError('Ошибка при поиске пользователей');
+      } finally {
+        if (!cancelled) {
+          setIsSearching(false);
+        }
+      }
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+    };
+  }, [searchTerm, searchTouched]);
 
   // Polling для проверки статуса invite
   useEffect(() => {
-    if (!activeInvite?.token || inviteStatus !== 'active') return;
+    if (!activeInvite?.token || (inviteStatus !== 'active' && inviteStatus !== 'waiting')) return;
 
     const checkInviteStatus = async () => {
       try {
@@ -81,6 +155,33 @@ const InviteManager = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inviteStatus, callPartner?.sip_username, selectedAccount?.id]);
 
+  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const value = event.target.value;
+    setSearchTouched(true);
+    setSearchTerm(value);
+    setSelectedUser(null);
+    if (!value.trim()) {
+      setSearchError(null);
+    }
+  };
+
+  const handleSelectUser = (user: UserSummary) => {
+    setSelectedUser(user);
+    setInvitedUser(null);
+    setSearchTerm(buildUserLabel(user));
+    setSearchResults([]);
+    setSearchError(null);
+  };
+
+  const handleClearSelection = () => {
+    setSelectedUser(null);
+    setInvitedUser(null);
+    setSearchTerm('');
+    setSearchResults([]);
+    setSearchError(null);
+    setSearchTouched(false);
+  };
+
   const initiateCall = async () => {
     if (!callPartner?.sip_username || !selectedAccount) return;
 
@@ -104,39 +205,74 @@ const InviteManager = () => {
   };
 
   const createInvite = async () => {
+    if (!selectedUser) {
+      setError('Выбери Telegram аккаунт перед созданием приглашения');
+      return;
+    }
+
+    let createdToken: string | null = null;
+
     try {
       dispatch(setInviteStatus('creating'));
       setError(null);
 
       const response = await apiClient.createInviteLink();
-      
-      if (response.success && response.data) {
-        const invite = response.data;
-        const link = `${window.location.origin}/miniphone?invite=${invite.token}`;
-        
-        dispatch(setCallMode('invite'));
-        dispatch(setInviteToken(invite.token));
-        dispatch(setActiveInvite(invite));
-        dispatch(setInviteLink(link));
-        dispatch(setInviteStatus('active'));
-      } else {
-        setError(response.error || 'Не удалось создать приглашение');
-        dispatch(setInviteStatus('idle'));
+
+      if (!response.success || !response.data) {
+        throw new Error(response.error || 'Не удалось создать приглашение');
       }
+
+      const invite = response.data;
+      createdToken = invite.token;
+
+      const baseUrl = typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBLIC_APP_URL || '';
+      const normalizedBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+      const link = `${normalizedBase}/miniphone?invite=${invite.token}`;
+
+      const sendResponse = await apiClient.sendInviteMessage({
+        telegram_id: selectedUser.telegram_id,
+        link,
+      });
+
+      if (!sendResponse.success) {
+        throw new Error(sendResponse.error || 'Не удалось отправить приглашение в Telegram');
+      }
+
+      setInvitedUser(selectedUser);
+      dispatch(setCallMode('invite'));
+      dispatch(setInviteToken(invite.token));
+      dispatch(setActiveInvite(invite));
+      dispatch(setInviteLink(link));
+      dispatch(setInviteStatus('waiting'));
+      showAlert('Приглашение отправлено', 'Мы отправили ссылку выбранному Telegram аккаунту', 'success');
     } catch (err) {
-      setError('Ошибка при создании приглашения');
+      if (createdToken) {
+        try {
+          await apiClient.cancelInvite(createdToken);
+        } catch (cancelError) {
+          console.error('Failed to rollback invite:', cancelError);
+        }
+      }
+
+      const errorMessage = err instanceof Error ? err.message : 'Ошибка при создании приглашения';
+      setError(errorMessage);
       dispatch(setInviteStatus('idle'));
       console.error('Failed to create invite:', err);
     }
   };
 
   const cancelInvite = async () => {
-    if (!activeInvite?.token) return;
+    if (!activeInvite?.token) {
+      dispatch(resetInvite());
+      setInvitedUser(null);
+      return;
+    }
 
     try {
       await apiClient.cancelInvite(activeInvite.token);
       dispatch(resetInvite());
       setError(null);
+      setInvitedUser(null);
     } catch (err) {
       console.error('Failed to cancel invite:', err);
     }
@@ -154,12 +290,79 @@ const InviteManager = () => {
 
   if (inviteStatus === 'idle') {
     return (
-      <div className="mb-6">
+      <div className="mb-6 p-4 bg-white rounded-lg border border-gray-200 shadow-sm">
+        <div className="mb-3">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Кому отправляем приглашение?
+          </label>
+          <div className="relative">
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={handleSearchChange}
+              onFocus={() => setSearchTouched(true)}
+              placeholder="Имя, @username или Telegram ID"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={handleClearSelection}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                aria-label="Очистить"
+              >
+                ✕
+              </button>
+            )}
+            {isSearching && (
+              <div className="absolute right-8 top-1/2 -translate-y-1/2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+              </div>
+            )}
+            {!!searchResults.length && (
+              <ul className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                {searchResults.map((user) => (
+                  <li key={user.id}>
+                    <button
+                      type="button"
+                      onClick={() => handleSelectUser(user)}
+                      className="w-full text-left px-3 py-2 hover:bg-blue-50"
+                    >
+                      <div className="text-sm font-medium text-gray-800">{buildUserLabel(user)}</div>
+                      <div className="text-xs text-gray-500">{buildUserMeta(user)}</div>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          {searchError && (
+            <p className="mt-2 text-xs text-red-600">{searchError}</p>
+          )}
+          {selectedUser && !searchError && (
+            <div className="mt-3 p-3 bg-blue-50 border border-blue-100 rounded-lg text-sm text-blue-700">
+              <div className="font-medium">Выбрано: {buildUserLabel(selectedUser)}</div>
+              <div>{buildUserMeta(selectedUser)}</div>
+            </div>
+          )}
+        </div>
+
+        {error && (
+          <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
+            {error}
+          </div>
+        )}
+
         <button
           onClick={createInvite}
-          className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+          disabled={!selectedUser || isSearching}
+          className={`w-full px-4 py-3 rounded-lg font-medium transition-colors ${
+            !selectedUser || isSearching
+              ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+              : 'bg-blue-600 text-white hover:bg-blue-700'
+          }`}
         >
-          📞 Создать приглашение
+          🚀 Создать и отправить приглашение
         </button>
       </div>
     );
@@ -192,6 +395,15 @@ const InviteManager = () => {
         {error && (
           <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
             {error}
+          </div>
+        )}
+
+        {invitedUser && (
+          <div className="mb-3 p-3 bg-gray-50 border border-gray-200 rounded text-sm text-gray-700">
+            <div>
+              Приглашение отправлено: <span className="font-medium">{buildUserLabel(invitedUser)}</span>
+            </div>
+            <div className="text-xs text-gray-500">{buildUserMeta(invitedUser)}</div>
           </div>
         )}
 
