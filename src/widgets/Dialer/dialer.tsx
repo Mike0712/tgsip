@@ -1,21 +1,14 @@
 import React from "react";
 import { useSelector } from 'react-redux';
 import Handset from '@/shared/ui/Handset/handset';
-import { RootState } from "@/app/store";
-import { useBridgeDialer } from '@/features/BridgeDialer/model/useBridgeDialer';
+import { setManualCall } from '@/entities/WebRtc/model/slice';
+import store, { RootState } from "@/app/store";
 
 const Dialer = () => {
   const sessionState = useSelector((state: RootState) => state.sip.sessionState);
   const invite = useSelector((state: RootState) => state.sip.invite);
-  const { startBridge } = useBridgeDialer();
   const onCall = (dialingNumber: string) => {
-    startBridge({
-      target: dialingNumber,
-      metadata: {
-        source: 'manual-dialer',
-        initiated_at: new Date().toISOString(),
-      },
-    });
+    store.dispatch(setManualCall(dialingNumber));
   };
 
   return (
