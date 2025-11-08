@@ -138,12 +138,41 @@ interface BridgeSession {
 }
 
 interface BridgeCreateResponse {
+  success?: boolean;
   bridge: BridgeSession;
-  participants: BridgeParticipant[];
+  participants?: BridgeParticipant[];
 }
 
 interface BridgeParticipantsResponse {
-  participants: BridgeParticipant[];
+  success?: boolean;
+  participants?: BridgeParticipant[];
+  result?: unknown;
+}
+
+interface CallSessionRecord {
+  id: number;
+  bridge_id: string;
+  link_hash: string;
+  status: 'pending' | 'active' | 'completed' | 'failed' | 'terminated';
+  server_id: number;
+  creator_user_id?: number | null;
+  metadata?: any;
+  created_at: string;
+  updated_at: string;
+}
+
+interface CallSessionParticipantRecord {
+  id: number;
+  session_id: number;
+  user_id?: number | null;
+  endpoint: string;
+  role: 'initiator' | 'participant';
+  status: 'pending' | 'dialing' | 'joined' | 'failed' | 'left';
+  joined_at?: string | null;
+  left_at?: string | null;
+  metadata?: any;
+  created_at: string;
+  updated_at: string;
 }
 
 class ApiClient {
@@ -435,16 +464,17 @@ class ApiClient {
     });
   }
 
-  async addBridgeParticipant(bridgeId: string, participant: {
-    type: BridgeParticipant['type'];
-    role: BridgeParticipant['role'];
-    reference: string;
-    display_name?: string;
-    metadata?: Record<string, unknown>;
-  }): Promise<ApiResponse<BridgeParticipantsResponse>> {
+  async addBridgeParticipant(
+    bridgeId: string,
+    payload: {
+      channel: string;
+      role?: string;
+      userId: number;
+    },
+  ): Promise<ApiResponse<BridgeParticipantsResponse>> {
     return this.request<BridgeParticipantsResponse>(`/calls/bridges/${bridgeId}/participants`, {
       method: 'POST',
-      body: JSON.stringify(participant),
+      body: JSON.stringify(payload),
     });
   }
 
@@ -452,8 +482,12 @@ class ApiClient {
     return this.request<BridgeCreateResponse>(`/calls/bridges/${bridgeId}`);
   }
 
-  async endBridgeSession(bridgeId: string): Promise<ApiResponse<{ bridge: BridgeSession }>> {
-    return this.request<{ bridge: BridgeSession }>(`/calls/bridges/${bridgeId}`, {
+  async getStoredCallSession(bridgeId: string): Promise<ApiResponse<{ session: CallSessionRecord; participants: CallSessionParticipantRecord[] }>> {
+    return this.request<{ session: CallSessionRecord; participants: CallSessionParticipantRecord[] }>(`/calls/sessions/${bridgeId}`);
+  }
+
+  async endBridgeSession(bridgeId: string): Promise<ApiResponse<{ success?: boolean }>> {
+    return this.request<{ success?: boolean }>(`/calls/bridges/${bridgeId}`, {
       method: 'DELETE',
     });
   }
@@ -478,4 +512,6 @@ export type {
   BridgeParticipant,
   BridgeSession,
   BridgeCreateResponse,
+  CallSessionRecord,
+  CallSessionParticipantRecord,
 };

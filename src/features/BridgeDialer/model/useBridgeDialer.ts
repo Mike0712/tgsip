@@ -2,7 +2,12 @@
 
 import { useCallback, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { apiClient, BridgeParticipant, BridgeSession } from '@/lib/api';
+import {
+  apiClient,
+  BridgeParticipant,
+  BridgeSession,
+  CallSessionRecord,
+} from '@/lib/api';
 import { RootState, AppDispatch } from '@/app/store';
 import {
   setBridgeStatus,
@@ -16,6 +21,21 @@ interface StartBridgeOptions {
   metadata?: Record<string, unknown>;
 }
 
+const mapSessionStatus = (status: CallSessionRecord['status']): RootState['sip']['bridgeStatus'] => {
+  switch (status) {
+    case 'active':
+      return 'active';
+    case 'completed':
+      return 'completed';
+    case 'failed':
+      return 'failed';
+    case 'terminated':
+      return 'completed';
+    default:
+      return 'creating';
+  }
+};
+
 interface UseBridgeDialerResult {
   bridgeSession: BridgeSession | null;
   bridgeParticipants: BridgeParticipant[];
@@ -23,15 +43,10 @@ interface UseBridgeDialerResult {
   isProcessing: boolean;
   error: string | null;
   startBridge: (options: StartBridgeOptions) => Promise<void>;
-  addParticipant: (participant: {
-    type: BridgeParticipant['type'];
-    role: BridgeParticipant['role'];
-    reference: string;
-    display_name?: string;
-    metadata?: Record<string, unknown>;
-  }) => Promise<void>;
+  addParticipant: (participant: { channel: string; role?: string; userId: number }) => Promise<void>;
   endBridge: () => Promise<void>;
   resetBridgeState: () => void;
+  loadSession: (bridgeId: string) => Promise<boolean>;
 }
 
 export const useBridgeDialer = (): UseBridgeDialerResult => {
@@ -54,12 +69,12 @@ export const useBridgeDialer = (): UseBridgeDialerResult => {
         metadata: options.metadata,
       });
 
-      if (!response.success || !response.data) {
+      if (!response.success || !response.data?.bridge) {
         throw new Error(response.error || 'Не удалось создать сессию');
       }
 
       dispatch(setBridgeSession(response.data.bridge));
-      dispatch(setBridgeParticipants(response.data.participants));
+      dispatch(setBridgeParticipants(response.data.participants ?? []));
       dispatch(setBridgeStatus('active'));
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Ошибка при создании сессии';
@@ -70,13 +85,7 @@ export const useBridgeDialer = (): UseBridgeDialerResult => {
     }
   }, [dispatch]);
 
-  const addParticipant = useCallback(async (participant: {
-    type: BridgeParticipant['type'];
-    role: BridgeParticipant['role'];
-    reference: string;
-    display_name?: string;
-    metadata?: Record<string, unknown>;
-  }) => {
+  const addParticipant = useCallback(async (participant: { channel: string; role?: string; userId: number }) => {
     if (!bridgeSession) {
       setError('Нет активной сессии');
       return;
@@ -88,11 +97,13 @@ export const useBridgeDialer = (): UseBridgeDialerResult => {
     try {
       const response = await apiClient.addBridgeParticipant(bridgeSession.id, participant);
 
-      if (!response.success || !response.data) {
+      if (!response.success) {
         throw new Error(response.error || 'Не удалось добавить участника');
       }
 
-      dispatch(setBridgeParticipants(response.data.participants));
+      if (response.data?.participants) {
+        dispatch(setBridgeParticipants(response.data.participants));
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Ошибка при добавлении участника';
       setError(message);
@@ -113,12 +124,11 @@ export const useBridgeDialer = (): UseBridgeDialerResult => {
     try {
       const response = await apiClient.endBridgeSession(bridgeSession.id);
 
-      if (!response.success || !response.data) {
+      if (!response.success) {
         throw new Error(response.error || 'Не удалось завершить сессию');
       }
 
-      dispatch(setBridgeSession(response.data.bridge));
-      dispatch(setBridgeStatus('completed'));
+      dispatch(resetBridge());
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Ошибка при завершении сессии';
       setError(message);
@@ -134,6 +144,37 @@ export const useBridgeDialer = (): UseBridgeDialerResult => {
     setIsProcessing(false);
   }, [dispatch]);
 
+  const loadSession = useCallback(async (bridgeId: string) => {
+    setIsProcessing(true);
+    setError(null);
+
+    try {
+      const storedSession = await apiClient.getStoredCallSession(bridgeId);
+
+      if (!storedSession.success || !storedSession.data?.session) {
+        throw new Error(storedSession.error || 'Не удалось найти сессию');
+      }
+
+      const bridgeResponse = await apiClient.getBridgeSession(bridgeId);
+
+      if (!bridgeResponse.success || !bridgeResponse.data?.bridge) {
+        throw new Error(bridgeResponse.error || 'Не удалось получить данные моста');
+      }
+
+      dispatch(setBridgeSession(bridgeResponse.data.bridge));
+      dispatch(setBridgeStatus(mapSessionStatus(storedSession.data.session.status)));
+      dispatch(setBridgeParticipants([]));
+
+      return true;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Ошибка при загрузке сессии';
+      setError(message);
+      return false;
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [dispatch]);
+
   return useMemo(() => ({
     bridgeSession,
     bridgeParticipants,
@@ -144,6 +185,7 @@ export const useBridgeDialer = (): UseBridgeDialerResult => {
     addParticipant,
     endBridge,
     resetBridgeState,
+    loadSession,
   }), [
     addParticipant,
     bridgeParticipants,
@@ -152,6 +194,7 @@ export const useBridgeDialer = (): UseBridgeDialerResult => {
     endBridge,
     error,
     isProcessing,
+    loadSession,
     resetBridgeState,
     startBridge,
   ]);

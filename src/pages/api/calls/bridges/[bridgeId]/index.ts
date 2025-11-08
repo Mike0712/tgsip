@@ -1,32 +1,24 @@
 import type { NextApiResponse } from 'next';
 import { withAuth, AuthenticatedRequest } from '@/lib/auth';
-import { bridgeStore } from '@/server/bridgeStore';
+import { callAsterisk } from '@/pages/api/ariProxy';
 
 const handler = async (req: AuthenticatedRequest, res: NextApiResponse) => {
   const { bridgeId } = req.query as { bridgeId: string };
 
+  if (!bridgeId) {
+    return res.status(400).json({ success: false, error: 'bridgeId is required' });
+  }
+
   try {
-    const bridge = bridgeStore.getBridge(bridgeId);
-
-    if (!bridge || bridge.creator_id !== req.user.userId) {
-      return res.status(404).json({ success: false, error: 'Bridge not found' });
-    }
-
     switch (req.method) {
       case 'GET': {
-        return res.status(200).json({
-          success: true,
-          bridge,
-          participants: bridge.participants,
-        });
+        const { data } = await callAsterisk(`/api/ari/bridges/${bridgeId}`, { userId: req.user.userId });
+        return res.status(200).json(data ?? { success: true });
       }
 
       case 'DELETE': {
-        const terminated = bridgeStore.terminateBridge(bridgeId);
-        return res.status(200).json({
-          success: true,
-          bridge: terminated,
-        });
+        await callAsterisk(`/api/ari/bridges/${bridgeId}`, { method: 'DELETE', userId: req.user.userId });
+        return res.status(200).json({ success: true });
       }
 
       default:
@@ -34,7 +26,7 @@ const handler = async (req: AuthenticatedRequest, res: NextApiResponse) => {
     }
   } catch (error) {
     console.error('Bridge handler error:', error);
-    return res.status(500).json({ success: false, error: 'Internal server error' });
+    return res.status(502).json({ success: false, error: 'Failed to communicate with Asterisk API' });
   }
 };
 

@@ -3,11 +3,11 @@
 import React from 'react';
 import dynamic from 'next/dynamic';
 import { useMiniPhoneController, MiniPhoneView } from '@/features/MiniPhone/model/useMiniPhoneController';
-import InviteManager from '@/widgets/InviteManager/invite-manager';
 import AudioButton from '@/shared/ui/AudioButton/audio-button';
 import { AlertProvider } from '@/shared/lib/hooks/useAlert';
 import { AlertContainer } from '@/shared/lib/AlertContainer';
 import { AuthErrorScreen } from '@/features/AuthError/ui/AuthErrorScreen';
+import { BridgeManager } from '@/widgets/BridgeManager';
 
 const DialerTelegram = dynamic(() => import('@/widgets/Dialer/dialer-telegram'), {
   ssr: false,
@@ -43,32 +43,6 @@ const ViewSwitcher: React.FC<ViewSwitcherProps> = ({ activeView, onChange }) => 
     >
       🤝 Общий экран
     </button>
-  </div>
-);
-
-interface GeneralScreenProps {
-  showInviteWaiting: boolean;
-  showInviteConnecting: boolean;
-}
-
-const GeneralScreen: React.FC<GeneralScreenProps> = ({ showInviteWaiting, showInviteConnecting }) => (
-  <div className="space-y-4">
-    <InviteManager />
-
-    {showInviteWaiting && (
-      <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
-        <p className="text-yellow-800 text-sm">⏳ Ожидание подключения второго участника...</p>
-      </div>
-    )}
-
-    {showInviteConnecting && (
-      <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-        <div className="flex items-center justify-center">
-          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mr-2" />
-          <span className="text-blue-700 text-sm">Подключение...</span>
-        </div>
-      </div>
-    )}
   </div>
 );
 
@@ -139,12 +113,7 @@ const MiniPhoneScreen: React.FC = () => {
             <ViewSwitcher activeView={controller.activeView} onChange={controller.setActiveView} />
           )}
 
-          {controller.showGeneralScreen && (
-            <GeneralScreen
-              showInviteWaiting={controller.showInviteWaiting}
-              showInviteConnecting={controller.showInviteConnecting}
-            />
-          )}
+          {controller.showGeneralScreen && <BridgeManager />}
 
           {controller.showDialer && <DialerTelegram />}
 

@@ -31,8 +31,6 @@ interface UseMiniPhoneControllerResult {
   canUseDialer: boolean;
   showDialer: boolean;
   showGeneralScreen: boolean;
-  showInviteWaiting: boolean;
-  showInviteConnecting: boolean;
 }
 
 export const useMiniPhoneController = (): UseMiniPhoneControllerResult => {
@@ -71,6 +69,15 @@ export const useMiniPhoneController = (): UseMiniPhoneControllerResult => {
       setActiveViewState('general');
     }
   }, [hasPhones, viewLocked, activeView]);
+
+  const bridgeParam = searchParams?.get('bridge');
+
+  useEffect(() => {
+    if (bridgeParam) {
+      setActiveViewState('general');
+      setViewLocked(true);
+    }
+  }, [bridgeParam]);
 
   useEffect(() => {
     if (!isClient) return;
@@ -251,9 +258,6 @@ export const useMiniPhoneController = (): UseMiniPhoneControllerResult => {
   const showDialer = activeView === 'dialer' && hasPhones;
   const showGeneralScreen = activeView === 'general' || !hasPhones;
 
-  const showInviteWaiting = callMode === 'invite' && inviteStatus === 'waiting';
-  const showInviteConnecting = callMode === 'invite' && inviteStatus === 'connecting';
-
   return useMemo(
     () => ({
       isLoadingAuth: isLoading,
@@ -269,8 +273,6 @@ export const useMiniPhoneController = (): UseMiniPhoneControllerResult => {
       canUseDialer: hasPhones,
       showDialer,
       showGeneralScreen,
-      showInviteWaiting,
-      showInviteConnecting,
     }),
     [
       activeView,
@@ -284,8 +286,6 @@ export const useMiniPhoneController = (): UseMiniPhoneControllerResult => {
       setActiveView,
       showDialer,
       showGeneralScreen,
-      showInviteConnecting,
-      showInviteWaiting,
       user,
     ],
   );

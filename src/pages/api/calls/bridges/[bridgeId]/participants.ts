@@ -1,6 +1,6 @@
 import type { NextApiResponse } from 'next';
 import { withAuth, AuthenticatedRequest } from '@/lib/auth';
-import { bridgeStore } from '@/server/bridgeStore';
+import { callAsterisk } from '@/pages/api/ariProxy';
 
 const handler = async (req: AuthenticatedRequest, res: NextApiResponse) => {
   if (req.method !== 'POST') {
@@ -9,37 +9,30 @@ const handler = async (req: AuthenticatedRequest, res: NextApiResponse) => {
 
   const { bridgeId } = req.query as { bridgeId: string };
 
+  if (!bridgeId) {
+    return res.status(400).json({ success: false, error: 'bridgeId is required' });
+  }
+
   try {
-    const bridge = bridgeStore.getBridge(bridgeId);
+    const { channel, role } = (req.body || {}) as { channel?: string; role?: string };
 
-    if (!bridge || bridge.creator_id !== req.user.userId) {
-      return res.status(404).json({ success: false, error: 'Bridge not found' });
+    if (!channel) {
+      return res.status(400).json({ success: false, error: 'channel is required' });
     }
 
-    const { type, role, reference, display_name, metadata } = req.body as {
-      type: 'user' | 'sip' | 'phone' | 'external';
-      role: 'initiator' | 'participant';
-      reference: string;
-      display_name?: string;
-      metadata?: Record<string, unknown>;
-    };
-
-    if (!type || !role || !reference) {
-      return res.status(400).json({ success: false, error: 'type, role and reference are required' });
-    }
-
-    const participants = bridgeStore.addParticipant(bridgeId, {
-      type,
-      role,
-      reference,
-      display_name,
-      metadata,
+    const { data } = await callAsterisk(`/api/ari/bridges/${bridgeId}/add`, {
+      method: 'POST',
+      body: {
+        channel,
+        role,
+      },
+      userId: req.user.userId,
     });
 
-    return res.status(200).json({ success: true, participants });
+    return res.status(200).json(data ?? { success: true });
   } catch (error) {
     console.error('Add participant error:', error);
-    return res.status(500).json({ success: false, error: 'Internal server error' });
+    return res.status(502).json({ success: false, error: 'Failed to add participant' });
   }
 };
 
