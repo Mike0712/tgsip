@@ -161,7 +161,30 @@ export const useBridgeDialer = (): UseBridgeDialerResult => {
         throw new Error(bridgeResponse.error || 'Не удалось получить данные моста');
       }
 
-      dispatch(setBridgeSession(bridgeResponse.data.bridge));
+      const rawStoredMeta = storedSession.data.session.metadata;
+      let storedMeta: Record<string, unknown> = {};
+      if (rawStoredMeta) {
+        if (typeof rawStoredMeta === 'string') {
+          try {
+            storedMeta = JSON.parse(rawStoredMeta) as Record<string, unknown>;
+          } catch (parseError) {
+            console.warn('Failed to parse stored session metadata', parseError);
+          }
+        } else if (typeof rawStoredMeta === 'object') {
+          storedMeta = rawStoredMeta as Record<string, unknown>;
+        }
+      }
+
+      const mergedMetadata = {
+        ...(bridgeResponse.data.bridge.metadata || {}),
+        join_extension: storedSession.data.session.join_extension,
+        stored_metadata: storedMeta,
+      } as Record<string, unknown>;
+
+      dispatch(setBridgeSession({
+        ...bridgeResponse.data.bridge,
+        metadata: mergedMetadata,
+      }));
       dispatch(setBridgeStatus(mapSessionStatus(storedSession.data.session.status)));
       dispatch(setBridgeParticipants([]));
 

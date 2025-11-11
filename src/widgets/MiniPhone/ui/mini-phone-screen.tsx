@@ -2,12 +2,19 @@
 
 import React from 'react';
 import dynamic from 'next/dynamic';
+import { useSelector } from 'react-redux';
+import { RootState } from '@/app/store';
 import { useMiniPhoneController, MiniPhoneView } from '@/features/MiniPhone/model/useMiniPhoneController';
 import AudioButton from '@/shared/ui/AudioButton/audio-button';
 import { AlertProvider } from '@/shared/lib/hooks/useAlert';
 import { AlertContainer } from '@/shared/lib/AlertContainer';
 import { AuthErrorScreen } from '@/features/AuthError/ui/AuthErrorScreen';
 import { BridgeManager } from '@/widgets/BridgeManager';
+
+const connectingSessionStates = new Set(['Establishing', 'Established']);
+const connectingInviteStates = new Set(['creating', 'waiting', 'connecting', 'ready', 'active']);
+const connectingCallStates = new Set(['waiting', 'connecting', 'active']);
+const connectingBridgeStates = new Set(['creating', 'active', 'terminating']);
 
 const DialerTelegram = dynamic(() => import('@/widgets/Dialer/dialer-telegram'), {
   ssr: false,
@@ -66,6 +73,16 @@ const PendingAuthScreen = () => (
 
 const MiniPhoneScreen: React.FC = () => {
   const controller = useMiniPhoneController();
+  const sessionState = useSelector((state: RootState) => state.sip.sessionState);
+  const inviteStatus = useSelector((state: RootState) => state.sip.inviteStatus);
+  const callStatus = useSelector((state: RootState) => state.sip.callStatus);
+  const bridgeStatus = useSelector((state: RootState) => state.sip.bridgeStatus);
+
+  const shouldShowAudioButton =
+    connectingSessionStates.has(sessionState) ||
+    connectingInviteStates.has(inviteStatus) ||
+    connectingCallStates.has(callStatus) ||
+    connectingBridgeStates.has(bridgeStatus);
 
   if (controller.isLoadingAuth) {
     return <LoadingScreen />;
@@ -101,14 +118,19 @@ const MiniPhoneScreen: React.FC = () => {
                 <p className="text-sm font-medium text-gray-700">
                   👤 {controller.user.first_name} {controller.user.last_name || ''}
                 </p>
-                {controller.user.username && (
-                  <p className="text-xs text-gray-500">@{controller.user.username}</p>
-                )}
-                <p className="text-xs text-green-600 mt-1">✅ Аутентифицирован</p>
               </div>
             )}
           </div>
 
+          {controller.user?.username && (
+            <p className="text-xs text-gray-500 text-center -mt-4 mb-4">@{controller.user.username}</p>
+          )}
+          {controller.user && (
+            <p className="text-xs text-green-600 text-center -mt-3 mb-4">✅ Аутентифицирован</p>
+          )}
+
+          {shouldShowAudioButton && <AudioButton />}
+          
           {controller.canUseDialer && (
             <ViewSwitcher activeView={controller.activeView} onChange={controller.setActiveView} />
           )}
@@ -121,8 +143,6 @@ const MiniPhoneScreen: React.FC = () => {
             <p className="text-xs text-gray-500">Powered by SIP.js & Telegram Web Apps</p>
           </div>
         </div>
-
-        <AudioButton />
       </div>
       <AlertContainer />
     </AlertProvider>

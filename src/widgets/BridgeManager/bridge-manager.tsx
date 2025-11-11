@@ -7,6 +7,7 @@ import { useBridgeDialer } from '@/features/BridgeDialer/model/useBridgeDialer';
 import { useAlert } from '@/shared/lib/hooks/useAlert';
 import { useAuth } from '@/hooks/useAuth';
 import { useSearchParams } from 'next/navigation';
+import { getSipServiceInstance } from '@/entities/WebRtc/services/sipServiceInstance';
 
 const formatStatus = (status: ReturnType<typeof useBridgeDialer>['bridgeStatus']) => {
   switch (status) {
@@ -34,16 +35,15 @@ const BridgeManager: React.FC = () => {
     isProcessing,
     error,
     startBridge,
-    addParticipant,
     endBridge,
     resetBridgeState,
-  loadSession,
+    loadSession,
   } = useBridgeDialer();
   const { showAlert } = useAlert();
   const { user } = useAuth();
-const searchParams = useSearchParams();
-const bridgeParam = searchParams?.get('bridge');
-const hasLoadedFromLink = useRef<string | null>(null);
+  const searchParams = useSearchParams();
+  const bridgeParam = searchParams?.get('bridge');
+  const hasLoadedFromLink = useRef<string | null>(null);
 
   const botUsername = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME;
 
@@ -53,7 +53,7 @@ const hasLoadedFromLink = useRef<string | null>(null);
   }, [bridgeSession, botUsername]);
 
   const appLink = useMemo(() => {
-    if (!bridgeSession || typeof window === 'undefined') return null;
+    if (!bridgeSession || process.env.NODE_ENV === 'production' || typeof window === 'undefined') return null;
     const origin = window.location.origin.replace(/\/$/, '');
     return `${origin}/miniphone?bridge=${bridgeSession.id}`;
   }, [bridgeSession]);
@@ -68,22 +68,48 @@ const hasLoadedFromLink = useRef<string | null>(null);
   };
 
   const handleJoin = async () => {
+    if (!bridgeSession?.id) {
+      showAlert('Нет активной сессии', 'Создай сессию или обнови страницу.', 'warning');
+      return;
+    }
+
     if (!selectedAccount?.sip_username) {
-      showAlert('Нет SIP аккаунта', 'Выбери SIP аккаунт перед подключением к сессии.', 'warning');
+      showAlert('Нет SIP аккаунта', 'Выбери или подключи SIP аккаунт и попробуй снова.', 'warning');
       return;
     }
 
-    if (!user?.id) {
-      showAlert('Нет данных пользователя', 'Перезайди в приложение, чтобы повторно авторизоваться.', 'warning');
+    const sipService = getSipServiceInstance();
+    if (!sipService) {
+      showAlert('SIP недоступен', 'Переподключи SIP перед присоединением.', 'warning');
       return;
     }
 
-    const channel = `PJSIP/${selectedAccount.sip_username}`;
-    await addParticipant({
-      channel,
-      role: 'participant',
-      userId: user.id,
-    });
+    const storedMeta = bridgeSession.metadata && typeof bridgeSession.metadata === 'object'
+      ? (bridgeSession.metadata as Record<string, unknown>)
+      : {};
+
+    const dialTarget =
+      (bridgeSession as any).join_extension ||
+      (storedMeta.join_extension as string) ||
+      (storedMeta.target as string) ||
+      bridgeSession.id.replace(/[^0-9A-Za-z]/g, '');
+
+    if (!dialTarget) {
+      showAlert('Нет маршрута', 'Для этой сессии не задано направление звонка.', 'warning');
+      return;
+    }
+
+    try {
+      await sipService.makeCall(
+        dialTarget,
+        () => {},
+        selectedAccount.sip_username,
+      );
+      showAlert('Звонок инициирован', `Подключение к сессии через ${dialTarget}`, 'success');
+    } catch (error) {
+      console.error('Failed to dial bridge extension:', error);
+      showAlert('Ошибка звонка', 'Не удалось инициировать звонок. Попробуй ещё раз.', 'error');
+    }
   };
 
   useEffect(() => {
@@ -188,11 +214,10 @@ const hasLoadedFromLink = useRef<string | null>(null);
         <button
           onClick={handleCreate}
           disabled={isProcessing || bridgeStatus === 'creating'}
-          className={`w-full px-4 py-3 rounded-lg font-medium transition-colors ${
-            isProcessing || bridgeStatus === 'creating'
+          className={`w-full px-4 py-3 rounded-lg font-medium transition-colors ${isProcessing || bridgeStatus === 'creating'
               ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
               : 'bg-blue-600 text-white hover:bg-blue-700'
-          }`}
+            }`}
         >
           Создать созвон
         </button>
@@ -214,13 +239,12 @@ const hasLoadedFromLink = useRef<string | null>(null);
 
           <div className="space-y-2">
             <button
-          onClick={handleJoin}
-          disabled={isProcessing || ['terminating', 'completed', 'failed'].includes(bridgeStatus)}
-          className={`w-full px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-            isProcessing || ['terminating', 'completed', 'failed'].includes(bridgeStatus)
-              ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-              : 'bg-green-600 text-white hover:bg-green-700'
-          }`}
+              onClick={handleJoin}
+              disabled={isProcessing || ['terminating', 'completed', 'failed'].includes(bridgeStatus)}
+              className={`w-full px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isProcessing || ['terminating', 'completed', 'failed'].includes(bridgeStatus)
+                  ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                  : 'bg-green-600 text-white hover:bg-green-700'
+                }`}
             >
               Присоединиться к сессии
             </button>
@@ -228,11 +252,10 @@ const hasLoadedFromLink = useRef<string | null>(null);
               <button
                 onClick={handleEnd}
                 disabled={isProcessing || bridgeStatus === 'terminating'}
-                className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  isProcessing || bridgeStatus === 'terminating'
+                className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isProcessing || bridgeStatus === 'terminating'
                     ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
                     : 'bg-red-600 text-white hover:bg-red-700'
-                }`}
+                  }`}
               >
                 Завершить сессию
               </button>

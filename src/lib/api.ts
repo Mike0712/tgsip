@@ -156,6 +156,7 @@ interface CallSessionRecord {
   status: 'pending' | 'active' | 'completed' | 'failed' | 'terminated';
   server_id: number;
   creator_user_id?: number | null;
+  join_extension: string;
   metadata?: any;
   created_at: string;
   updated_at: string;
