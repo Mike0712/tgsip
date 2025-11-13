@@ -7,6 +7,7 @@ import {
   BridgeParticipant,
   BridgeSession,
   CallSessionRecord,
+  CallSessionParticipantRecord,
 } from '@/lib/api';
 import { RootState, AppDispatch } from '@/app/store';
 import {
@@ -36,6 +37,45 @@ const mapSessionStatus = (status: CallSessionRecord['status']): RootState['sip']
   }
 };
 
+const parseMetadataField = (raw: unknown, context: string): Record<string, unknown> | undefined => {
+  if (!raw) {
+    return undefined;
+  }
+
+  if (typeof raw === 'string') {
+    try {
+      return JSON.parse(raw) as Record<string, unknown>;
+    } catch (error) {
+      console.warn(`Failed to parse metadata (${context})`, error);
+      return undefined;
+    }
+  }
+
+  if (typeof raw === 'object') {
+    return raw as Record<string, unknown>;
+  }
+
+  return undefined;
+};
+
+const mapParticipantRecords = (participants: CallSessionParticipantRecord[]) => participants.map((participant) => {
+  const participantMeta = parseMetadataField(participant.metadata, `participant:${participant.id}`);
+
+  return {
+    id: String(participant.id),
+    type: 'sip',
+    role: participant.role ?? 'participant',
+    reference: participant.endpoint,
+    display_name:
+      (participantMeta?.display_name as string)
+        ?? participant.endpoint,
+    status: participant.status ?? 'pending',
+    created_at: participant.created_at,
+    updated_at: participant.updated_at,
+    metadata: participantMeta,
+  } as BridgeParticipant;
+});
+
 interface UseBridgeDialerResult {
   bridgeSession: BridgeSession | null;
   bridgeParticipants: BridgeParticipant[];
@@ -47,6 +87,7 @@ interface UseBridgeDialerResult {
   endBridge: () => Promise<void>;
   resetBridgeState: () => void;
   loadSession: (bridgeId: string) => Promise<boolean>;
+  refreshSession: () => Promise<void>;
 }
 
 export const useBridgeDialer = (): UseBridgeDialerResult => {
@@ -144,6 +185,66 @@ export const useBridgeDialer = (): UseBridgeDialerResult => {
     setIsProcessing(false);
   }, [dispatch]);
 
+  const refreshSession = useCallback(async () => {
+    if (!bridgeSession?.id) {
+      return;
+    }
+
+    try {
+      const [storedSession, bridgeResponse] = await Promise.all([
+        apiClient.getStoredCallSession(bridgeSession.id),
+        apiClient.getBridgeSession(bridgeSession.id),
+      ]);
+
+      if (!storedSession.success || !storedSession.data?.session) {
+        return;
+      }
+
+      const sessionRecord = storedSession.data.session;
+
+      const storedMeta = parseMetadataField(sessionRecord.metadata, `session:${sessionRecord.id}`) ?? {};
+
+      let updatedBridge: BridgeSession | null = null;
+
+      if (bridgeResponse.success && bridgeResponse.data?.bridge) {
+        updatedBridge = {
+          ...bridgeResponse.data.bridge,
+          join_extension:
+            sessionRecord.join_extension ??
+            bridgeResponse.data.bridge.join_extension ??
+            bridgeSession.join_extension,
+          metadata: {
+            ...(bridgeResponse.data.bridge.metadata || {}),
+            join_extension: sessionRecord.join_extension,
+            stored_metadata: storedMeta,
+          },
+        };
+      } else if (bridgeSession) {
+        updatedBridge = {
+          ...bridgeSession,
+          join_extension: sessionRecord.join_extension ?? bridgeSession.join_extension,
+          metadata: {
+            ...(bridgeSession.metadata || {}),
+            join_extension: sessionRecord.join_extension,
+            stored_metadata: storedMeta,
+          },
+        };
+      }
+
+      if (updatedBridge) {
+        dispatch(setBridgeSession(updatedBridge));
+      }
+
+      dispatch(setBridgeStatus(mapSessionStatus(sessionRecord.status)));
+
+      const participants = storedSession.data.participants ?? [];
+
+      dispatch(setBridgeParticipants(mapParticipantRecords(participants)));
+    } catch (err) {
+      console.warn('Failed to refresh bridge session', err);
+    }
+  }, [bridgeSession, dispatch]);
+
   const loadSession = useCallback(async (bridgeId: string) => {
     setIsProcessing(true);
     setError(null);
@@ -161,19 +262,7 @@ export const useBridgeDialer = (): UseBridgeDialerResult => {
         throw new Error(bridgeResponse.error || 'Не удалось получить данные моста');
       }
 
-      const rawStoredMeta = storedSession.data.session.metadata;
-      let storedMeta: Record<string, unknown> = {};
-      if (rawStoredMeta) {
-        if (typeof rawStoredMeta === 'string') {
-          try {
-            storedMeta = JSON.parse(rawStoredMeta) as Record<string, unknown>;
-          } catch (parseError) {
-            console.warn('Failed to parse stored session metadata', parseError);
-          }
-        } else if (typeof rawStoredMeta === 'object') {
-          storedMeta = rawStoredMeta as Record<string, unknown>;
-        }
-      }
+      const storedMeta = parseMetadataField(storedSession.data.session.metadata, `session:${storedSession.data.session.id}`) ?? {};
 
       const mergedMetadata = {
         ...(bridgeResponse.data.bridge.metadata || {}),
@@ -183,10 +272,12 @@ export const useBridgeDialer = (): UseBridgeDialerResult => {
 
       dispatch(setBridgeSession({
         ...bridgeResponse.data.bridge,
+        join_extension: storedSession.data.session.join_extension,
         metadata: mergedMetadata,
       }));
       dispatch(setBridgeStatus(mapSessionStatus(storedSession.data.session.status)));
-      dispatch(setBridgeParticipants([]));
+      const participants = storedSession.data.participants ?? [];
+      dispatch(setBridgeParticipants(mapParticipantRecords(participants)));
 
       return true;
     } catch (err) {
@@ -209,6 +300,7 @@ export const useBridgeDialer = (): UseBridgeDialerResult => {
     endBridge,
     resetBridgeState,
     loadSession,
+    refreshSession,
   }), [
     addParticipant,
     bridgeParticipants,
@@ -218,6 +310,7 @@ export const useBridgeDialer = (): UseBridgeDialerResult => {
     error,
     isProcessing,
     loadSession,
+    refreshSession,
     resetBridgeState,
     startBridge,
   ]);

@@ -39,6 +39,7 @@ const BridgeManager: React.FC = () => {
     endBridge,
     resetBridgeState,
     loadSession,
+    refreshSession,
   } = useBridgeDialer();
   const { showAlert } = useAlert();
   const { user } = useAuth();
@@ -124,6 +125,40 @@ const BridgeManager: React.FC = () => {
       }
     });
   }, [bridgeParam, bridgeSession, loadSession]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    if (!bridgeSession?.id) {
+      return;
+    }
+
+    if (!['creating', 'active'].includes(bridgeStatus)) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const tick = async () => {
+      if (cancelled) {
+        return;
+      }
+      await refreshSession();
+    };
+
+    void tick();
+
+    const intervalId = window.setInterval(() => {
+      void refreshSession();
+    }, 5000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [bridgeSession?.id, bridgeStatus, refreshSession]);
 
   const handleEnd = async () => {
     await endBridge();
