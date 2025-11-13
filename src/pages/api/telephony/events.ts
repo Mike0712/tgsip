@@ -1,6 +1,11 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { withAuth, AuthenticatedRequest } from '@/lib/auth';
-import { findCallSessionByBridge, updateCallSessionStatus, upsertCallSessionParticipant } from '@/lib/callSessions';
+import {
+  findCallSessionByBridge,
+  findCallSessionByExtension,
+  updateCallSessionStatus,
+  upsertCallSessionParticipant,
+} from '@/lib/callSessions';
 
 interface TelephonyEventPayload {
   event?: string;
@@ -28,14 +33,47 @@ const eventsHandler = async (req: AuthenticatedRequest, res: NextApiResponse) =>
   }
 
   const payload = (req.body || {}) as TelephonyEventPayload;
-  const { event, bridge_id: bridgeId } = payload;
+  const { event } = payload;
 
-  if (!event || !bridgeId) {
-    return res.status(400).json({ success: false, error: 'event and bridge_id are required' });
+  if (!event) {
+    return res.status(400).json({ success: false, error: 'event is required' });
   }
 
+  let bridgeId = payload.bridge_id;
+  let session = null;
+
   try {
-    const session = await findCallSessionByBridge(bridgeId);
+    if (bridgeId) {
+      session = await findCallSessionByBridge(bridgeId);
+    }
+
+    if (!session) {
+      const extensionCandidates = [
+        payload.endpoint,
+        payload.caller,
+        payload.metadata?.join_extension,
+        payload.metadata?.endpoint,
+      ]
+        .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+        .map((value) => value.trim());
+
+      for (const candidate of extensionCandidates) {
+        let found = await findCallSessionByExtension(candidate);
+
+        if (!found && /\D/.test(candidate)) {
+          const numericExt = candidate.replace(/\D+/g, '');
+          if (numericExt) {
+            found = await findCallSessionByExtension(numericExt);
+          }
+        }
+
+        if (found) {
+          session = found;
+          bridgeId = found.bridge_id;
+          break;
+        }
+      }
+    }
 
     if (!session) {
       return res.status(404).json({ success: false, error: 'Session not found' });

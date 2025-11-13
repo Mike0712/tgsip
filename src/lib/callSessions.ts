@@ -67,6 +67,12 @@ export const findCallSessionByBridge = async (bridgeId: string) => {
   return session || null;
 };
 
+export const findCallSessionByExtension = async (extension: string) => {
+  const db = getDb();
+  const session = await db('call_sessions').where({ join_extension: extension }).first();
+  return session || null;
+};
+
 export const updateCallSessionStatus = async (
   sessionId: number,
   status: 'pending' | 'active' | 'completed' | 'failed' | 'terminated',
