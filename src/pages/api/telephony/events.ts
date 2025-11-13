@@ -12,6 +12,16 @@ interface TelephonyEventPayload {
   metadata?: Record<string, unknown>;
 }
 
+const allowedIps = (process.env.ALLOWED_TELEPHONY_IPS ?? '').split(',').map(ip => ip.trim()).filter(Boolean);
+
+const ipAuthWrapper = (handler: any) => async (req: any, res: any) => {
+  const realIp = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress;
+  if (!allowedIps.includes(realIp)) {
+    return res.status(401).json({ error: 'Unauthorized (ip)' });
+  }
+  return handler(req, res);
+};
+
 const eventsHandler = async (req: AuthenticatedRequest, res: NextApiResponse) => {
   if (req.method !== 'POST') {
     return res.status(405).json({ success: false, error: 'Method not allowed' });
@@ -77,4 +87,4 @@ const eventsHandler = async (req: AuthenticatedRequest, res: NextApiResponse) =>
   }
 };
 
-export default withAuth(eventsHandler);
+export default ipAuthWrapper(eventsHandler);
