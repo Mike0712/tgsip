@@ -71,7 +71,10 @@ const handler = async (req: AuthenticatedRequest, res: NextApiResponse) => {
 
         return res.status(201).json({
           success: true,
-          bridge,
+          bridge: {
+            ...bridge,
+            join_extension: session?.join_extension || null,
+          },
           session,
         });
       } catch (error) {

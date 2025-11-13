@@ -135,6 +135,7 @@ interface BridgeSession {
   metadata?: Record<string, unknown>;
   created_at: string;
   updated_at: string;
+  join_extension?: string;
 }
 
 interface BridgeCreateResponse {

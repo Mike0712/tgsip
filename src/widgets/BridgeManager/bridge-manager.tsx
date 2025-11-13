@@ -8,6 +8,7 @@ import { useAlert } from '@/shared/lib/hooks/useAlert';
 import { useAuth } from '@/hooks/useAuth';
 import { useSearchParams } from 'next/navigation';
 import { getSipServiceInstance } from '@/entities/WebRtc/services/sipServiceInstance';
+import { BridgeSession } from '@/lib/api';
 
 const formatStatus = (status: ReturnType<typeof useBridgeDialer>['bridgeStatus']) => {
   switch (status) {
@@ -84,16 +85,8 @@ const BridgeManager: React.FC = () => {
       return;
     }
 
-    const storedMeta = bridgeSession.metadata && typeof bridgeSession.metadata === 'object'
-      ? (bridgeSession.metadata as Record<string, unknown>)
-      : {};
-
-    const dialTarget =
-      (bridgeSession as any).join_extension ||
-      (storedMeta.join_extension as string) ||
-      (storedMeta.target as string) ||
-      bridgeSession.id.replace(/[^0-9A-Za-z]/g, '');
-
+    const dialTarget = (bridgeSession as BridgeSession).join_extension || null;
+    
     if (!dialTarget) {
       showAlert('Нет маршрута', 'Для этой сессии не задано направление звонка.', 'warning');
       return;
