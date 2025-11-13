@@ -65,6 +65,8 @@ const extractPayload = (body: any): TelephonyEventPayload | null => {
   }
 
   if (typeof body === 'object') {
+    const keys = Object.keys(body);
+
     if ('event' in body) {
       return body as TelephonyEventPayload;
     }
@@ -75,6 +77,13 @@ const extractPayload = (body: any): TelephonyEventPayload | null => {
 
     if (typeof body.payload === 'string') {
       return parseJson(body.payload);
+    }
+
+    if (keys.length === 1 && keys[0]?.trim().startsWith('{')) {
+      const parsed = parseJson(keys[0]);
+      if (parsed) {
+        return parsed;
+      }
     }
   }
 
