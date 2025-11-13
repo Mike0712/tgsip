@@ -191,10 +191,7 @@ export const useBridgeDialer = (): UseBridgeDialerResult => {
     }
 
     try {
-      const [storedSession, bridgeResponse] = await Promise.all([
-        apiClient.getStoredCallSession(bridgeSession.id),
-        apiClient.getBridgeSession(bridgeSession.id),
-      ]);
+      const storedSession = await apiClient.getStoredCallSession(bridgeSession.id);
 
       if (!storedSession.success || !storedSession.data?.session) {
         return;
@@ -204,36 +201,17 @@ export const useBridgeDialer = (): UseBridgeDialerResult => {
 
       const storedMeta = parseMetadataField(sessionRecord.metadata, `session:${sessionRecord.id}`) ?? {};
 
-      let updatedBridge: BridgeSession | null = null;
+      const updatedBridge: BridgeSession = {
+        ...bridgeSession,
+        join_extension: sessionRecord.join_extension ?? bridgeSession.join_extension,
+        metadata: {
+          ...(bridgeSession.metadata || {}),
+          join_extension: sessionRecord.join_extension,
+          stored_metadata: storedMeta,
+        },
+      };
 
-      if (bridgeResponse.success && bridgeResponse.data?.bridge) {
-        updatedBridge = {
-          ...bridgeResponse.data.bridge,
-          join_extension:
-            sessionRecord.join_extension ??
-            bridgeResponse.data.bridge.join_extension ??
-            bridgeSession.join_extension,
-          metadata: {
-            ...(bridgeResponse.data.bridge.metadata || {}),
-            join_extension: sessionRecord.join_extension,
-            stored_metadata: storedMeta,
-          },
-        };
-      } else if (bridgeSession) {
-        updatedBridge = {
-          ...bridgeSession,
-          join_extension: sessionRecord.join_extension ?? bridgeSession.join_extension,
-          metadata: {
-            ...(bridgeSession.metadata || {}),
-            join_extension: sessionRecord.join_extension,
-            stored_metadata: storedMeta,
-          },
-        };
-      }
-
-      if (updatedBridge) {
-        dispatch(setBridgeSession(updatedBridge));
-      }
+      dispatch(setBridgeSession(updatedBridge));
 
       dispatch(setBridgeStatus(mapSessionStatus(sessionRecord.status)));
 
