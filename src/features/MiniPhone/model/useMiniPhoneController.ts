@@ -42,8 +42,23 @@ export const useMiniPhoneController = (): UseMiniPhoneControllerResult => {
   const [isClient, setIsClient] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [attemptedAuth, setAttemptedAuth] = useState(false);
+  
+  // Вычисляем bridgeParam раньше, чтобы использовать его в начальном состоянии
+  const bridgeParamFromUrl = searchParams?.get('bridge');
+  
+  // Получаем bridge ID из startParam, если Web App открыт через deep link
+  const bridgeParamFromStartParam = (() => {
+    if (typeof window === 'undefined') return null;
+    const tg = window.Telegram?.WebApp;
+    return tg?.startParam || null;
+  })();
+  
+  // Приоритет: URL параметр > startParam
+  const bridgeParam = bridgeParamFromUrl || bridgeParamFromStartParam;
+  
+  // Если есть bridgeParam, блокируем view, чтобы предотвратить автоматическое переключение на 'dialer'
   const [activeView, setActiveViewState] = useState<MiniPhoneView>('general');
-  const [viewLocked, setViewLocked] = useState(false);
+  const [viewLocked, setViewLocked] = useState(!!bridgeParam);
 
   const inviteToken = useSelector((state: RootState) => state.sip.inviteToken);
   const callMode = useSelector((state: RootState) => state.sip.callMode);
@@ -60,34 +75,28 @@ export const useMiniPhoneController = (): UseMiniPhoneControllerResult => {
     setIsClient(true);
   }, []);
 
-  useEffect(() => {
-    if (hasPhones && !viewLocked) {
-      setActiveViewState('dialer');
-    }
-
-    if (!hasPhones && activeView === 'dialer') {
-      setActiveViewState('general');
-    }
-  }, [hasPhones, viewLocked, activeView]);
-
-  const bridgeParamFromUrl = searchParams?.get('bridge');
-  
-  // Получаем bridge ID из startParam, если Web App открыт через deep link
-  const bridgeParamFromStartParam = (() => {
-    if (typeof window === 'undefined') return null;
-    const tg = window.Telegram?.WebApp;
-    return tg?.startParam || null;
-  })();
-  
-  // Приоритет: URL параметр > startParam
-  const bridgeParam = bridgeParamFromUrl || bridgeParamFromStartParam;
-
+  // Если есть bridgeParam, сразу блокируем view и устанавливаем 'general'
   useEffect(() => {
     if (bridgeParam) {
       setActiveViewState('general');
       setViewLocked(true);
     }
   }, [bridgeParam]);
+
+  // Автоматическое переключение на 'dialer' только если нет bridgeParam и view не заблокирован
+  useEffect(() => {
+    if (bridgeParam || viewLocked) {
+      return; // Не переключаем, если есть bridgeParam или view заблокирован
+    }
+
+    if (hasPhones) {
+      setActiveViewState('dialer');
+    }
+
+    if (!hasPhones && activeView === 'dialer') {
+      setActiveViewState('general');
+    }
+  }, [hasPhones, viewLocked, activeView, bridgeParam]);
 
   useEffect(() => {
     if (!isClient) return;
