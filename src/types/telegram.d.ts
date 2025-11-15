@@ -20,6 +20,7 @@ declare global {
           auth_date?: number;
           hash?: string;
         };
+        startParam?: string;
         version: string;
         platform: string;
         colorScheme: 'light' | 'dark';

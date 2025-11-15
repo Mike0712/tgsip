@@ -44,7 +44,17 @@ const BridgeManager: React.FC = () => {
   const { showAlert } = useAlert();
   const { user } = useAuth();
   const searchParams = useSearchParams();
-  const bridgeParam = searchParams?.get('bridge');
+  const bridgeParamFromUrl = searchParams?.get('bridge');
+  
+  // Получаем bridge ID из startParam, если Web App открыт через deep link
+  const bridgeParamFromStartParam = (() => {
+    if (typeof window === 'undefined') return null;
+    const tg = window.Telegram?.WebApp;
+    return tg?.startParam || null;
+  })();
+  
+  // Приоритет: URL параметр > startParam
+  const bridgeParam = bridgeParamFromUrl || bridgeParamFromStartParam;
   const hasLoadedFromLink = useRef<string | null>(null);
 
   const botUsername = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME;
@@ -313,6 +323,8 @@ const BridgeManager: React.FC = () => {
               </ul>
             </div>
           )}
+
+          
         </>
       )}
     </div>
