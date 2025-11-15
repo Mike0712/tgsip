@@ -70,16 +70,8 @@ export const useMiniPhoneController = (): UseMiniPhoneControllerResult => {
     }
   }, [hasPhones, viewLocked, activeView]);
 
-  // Получаем bridge ID из URL параметра или из startParam (deep link)
-  const bridgeParamFromUrl = searchParams?.get('bridge');
-  const bridgeParamFromStartParam = (() => {
-    if (typeof window === 'undefined') return null;
-    const tg = window.Telegram?.WebApp;
-    return tg?.startParam || null;
-  })();
-  
-  // Приоритет: URL параметр > startParam
-  const bridgeParam = bridgeParamFromUrl || bridgeParamFromStartParam;
+  // Получаем bridge ID только из параметра 'startapp'
+  const bridgeParam = searchParams?.get('startapp');
 
   useEffect(() => {
     if (bridgeParam) {

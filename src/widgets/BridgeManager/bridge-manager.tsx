@@ -44,17 +44,8 @@ const BridgeManager: React.FC = () => {
   const { showAlert } = useAlert();
   const { user } = useAuth();
   const searchParams = useSearchParams();
-  const bridgeParamFromUrl = searchParams?.get('bridge');
-  
-  // Получаем bridge ID из startParam, если Web App открыт через deep link
-  const bridgeParamFromStartParam = (() => {
-    if (typeof window === 'undefined') return null;
-    const tg = window.Telegram?.WebApp;
-    return tg?.startParam || null;
-  })();
-  
-  // Приоритет: URL параметр > startParam
-  const bridgeParam = bridgeParamFromUrl || bridgeParamFromStartParam;
+  // Получаем bridge ID только из параметра 'startapp'
+  const bridgeParam = searchParams?.get('startapp');
   const hasLoadedFromLink = useRef<string | null>(null);
   const isLoadingSession = useRef(false);
   const refreshAttempts = useRef(0);
