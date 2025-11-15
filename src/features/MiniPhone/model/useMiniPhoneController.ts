@@ -42,36 +42,8 @@ export const useMiniPhoneController = (): UseMiniPhoneControllerResult => {
   const [isClient, setIsClient] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [attemptedAuth, setAttemptedAuth] = useState(false);
-  
-  // Вычисляем bridgeParam раньше, чтобы использовать его в начальном состоянии
-  const bridgeParamFromUrl = searchParams?.get('bridge');
-  
-  // Получаем bridge ID из startParam, если Web App открыт через deep link
-  // Важно: проверяем только на клиенте
-  const bridgeParamFromStartParam = (() => {
-    if (typeof window === 'undefined') return null;
-    const tg = window.Telegram?.WebApp;
-    return tg?.startParam || null;
-  })();
-  
-  // Приоритет: URL параметр > startParam
-  const bridgeParam = bridgeParamFromUrl || bridgeParamFromStartParam;
-  
-  // Если есть bridgeParam, блокируем view, чтобы предотвратить автоматическое переключение на 'dialer'
   const [activeView, setActiveViewState] = useState<MiniPhoneView>('general');
-  // Начальное значение viewLocked: проверяем синхронно при инициализации
-  const [viewLocked, setViewLocked] = useState(() => {
-    // Проверяем URL параметр
-    const urlParam = searchParams?.get('bridge');
-    if (urlParam) return true;
-    
-    // Проверяем startParam (только на клиенте)
-    if (typeof window !== 'undefined') {
-      const tg = window.Telegram?.WebApp;
-      if (tg?.startParam) return true;
-    }
-    return false;
-  });
+  const [viewLocked, setViewLocked] = useState(false);
 
   const inviteToken = useSelector((state: RootState) => state.sip.inviteToken);
   const callMode = useSelector((state: RootState) => state.sip.callMode);
@@ -88,39 +60,24 @@ export const useMiniPhoneController = (): UseMiniPhoneControllerResult => {
     setIsClient(true);
   }, []);
 
-  // Управление переключением view: сначала проверяем bridgeParam, потом автоматическое переключение
   useEffect(() => {
-    if (!isClient) return;
-    
-    // Перепроверяем bridgeParam на клиенте (startParam может быть недоступен на SSR)
-    const urlParam = searchParams?.get('bridge');
-    const startParam = typeof window !== 'undefined' && window.Telegram?.WebApp?.startParam
-      ? window.Telegram.WebApp.startParam
-      : null;
-    const hasBridgeParam = urlParam || startParam;
-    
-    // Приоритет 1: Если есть bridgeParam, блокируем view и устанавливаем 'general'
-    // Это должно сработать ДО проверки hasPhones
-    if (hasBridgeParam) {
+    if (hasPhones && !viewLocked) {
+      setActiveViewState('dialer');
+    }
+
+    if (!hasPhones && activeView === 'dialer') {
+      setActiveViewState('general');
+    }
+  }, [hasPhones, viewLocked, activeView]);
+
+  const bridgeParam = searchParams?.get('bridge');
+
+  useEffect(() => {
+    if (bridgeParam) {
       setActiveViewState('general');
       setViewLocked(true);
-      return; // Выходим, не переключаем на 'dialer'
     }
-    
-    // Приоритет 2: Если view заблокирован, не переключаем
-    // Это защита на случай, если viewLocked был установлен ранее
-    if (viewLocked) {
-      return;
-    }
-    
-    // Приоритет 3: Автоматическое переключение на 'dialer' только если нет bridgeParam
-    // Это сработает только если нет bridgeParam и view не заблокирован
-    if (hasPhones) {
-      setActiveViewState('dialer');
-    } else if (activeView === 'dialer') {
-      setActiveViewState('general');
-    }
-  }, [isClient, hasPhones, viewLocked, activeView, searchParams]);
+  }, [bridgeParam]);
 
   useEffect(() => {
     if (!isClient) return;
@@ -294,17 +251,12 @@ export const useMiniPhoneController = (): UseMiniPhoneControllerResult => {
   }, []);
 
   const setActiveView = useCallback((view: MiniPhoneView) => {
-    // Если view заблокирован из-за bridgeParam, не позволяем переключать на 'dialer'
-    if (viewLocked && view === 'dialer') {
-      return;
-    }
     setActiveViewState(view);
     setViewLocked(true);
-  }, [viewLocked]);
+  }, []);
 
-  // Если есть bridgeParam, всегда показываем general screen
-  const showDialer = activeView === 'dialer' && hasPhones && !bridgeParam;
-  const showGeneralScreen = (activeView === 'general' || !hasPhones || !!bridgeParam);
+  const showDialer = activeView === 'dialer' && hasPhones;
+  const showGeneralScreen = activeView === 'general' || !hasPhones;
 
   return useMemo(
     () => ({
