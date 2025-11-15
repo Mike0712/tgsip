@@ -111,7 +111,6 @@ const MiniPhoneScreen: React.FC = () => {
         <div className="max-w-md mx-auto">
           <div className="text-center mb-6">
             <h1 className="text-2xl font-bold text-gray-800 mb-2">📞 MiniPhone</h1>
-            <p className="text-sm text-gray-600">SIP телефония в Telegram</p>
 
             {controller.user && (
               <div className="mt-3 p-3 bg-white rounded-lg shadow-sm">

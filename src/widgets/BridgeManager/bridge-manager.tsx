@@ -56,6 +56,9 @@ const BridgeManager: React.FC = () => {
   // Приоритет: URL параметр > startParam
   const bridgeParam = bridgeParamFromUrl || bridgeParamFromStartParam;
   const hasLoadedFromLink = useRef<string | null>(null);
+  const isLoadingSession = useRef(false);
+  const refreshAttempts = useRef(0);
+  const isRefreshing = useRef(false);
 
   const botUsername = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME;
 
@@ -129,10 +132,20 @@ const BridgeManager: React.FC = () => {
       return;
     }
 
+    // Защита от множественных параллельных вызовов
+    if (isLoadingSession.current) {
+      return;
+    }
+
+    isLoadingSession.current = true;
     loadSession(bridgeParam).then((success) => {
+      isLoadingSession.current = false;
       if (success) {
         hasLoadedFromLink.current = bridgeParam;
+        refreshAttempts.current = 0; // Сбрасываем счетчик при успешной загрузке
       }
+    }).catch(() => {
+      isLoadingSession.current = false;
     });
   }, [bridgeParam, bridgeSession, loadSession]);
 
@@ -149,19 +162,36 @@ const BridgeManager: React.FC = () => {
       return;
     }
 
+    // Ограничиваем количество попыток до 3
+    if (refreshAttempts.current >= 3) {
+      return;
+    }
+
     let cancelled = false;
 
     const tick = async () => {
-      if (cancelled) {
+      if (cancelled || isRefreshing.current) {
         return;
       }
-      await refreshSession();
+      
+      isRefreshing.current = true;
+      refreshAttempts.current += 1;
+      
+      try {
+        await refreshSession();
+      } finally {
+        isRefreshing.current = false;
+      }
     };
 
     void tick();
 
     const intervalId = window.setInterval(() => {
-      void refreshSession();
+      if (refreshAttempts.current >= 3) {
+        window.clearInterval(intervalId);
+        return;
+      }
+      void tick();
     }, 5000);
 
     return () => {
