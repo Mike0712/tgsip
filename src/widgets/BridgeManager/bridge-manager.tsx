@@ -69,7 +69,7 @@ const BridgeManager: React.FC = () => {
   const appLink = useMemo(() => {
     if (!bridgeSession || process.env.NODE_ENV === 'production' || typeof window === 'undefined') return null;
     const origin = window.location.origin.replace(/\/$/, '');
-    return `${origin}/miniphone?bridge=${bridgeSession.id}`;
+    return `${origin}/miniphone?startapp=${bridgeSession.id}`;
   }, [bridgeSession]);
 
   const handleCreate = async () => {

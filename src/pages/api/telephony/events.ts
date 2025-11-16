@@ -20,9 +20,9 @@ interface TelephonyEventPayload {
 const allowedIps = (process.env.ALLOWED_TELEPHONY_IPS ?? '').split(',').map(ip => ip.trim()).filter(Boolean);
 
 const ipAuthWrapper = (handler: any) => async (req: any, res: any) => {
-  const realIp = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress;
+  const realIp = req.headers['x-forwarded-for']?.split(',')[0].trim().replace(/^::ffff:/i, '') || req.socket.remoteAddress;
   if (!allowedIps.includes(realIp)) {
-    return res.status(401).json({ error: 'Unauthorized (ip)' });
+    return res.status(401).json({ error: `Unauthorized (ip) - ${realIp}` });
   }
   return handler(req, res);
 };
