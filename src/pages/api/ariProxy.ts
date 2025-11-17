@@ -45,6 +45,9 @@ const resolveAsteriskBaseUrl = async (userId: number): Promise<string> => {
     throw new Error('Current user has no linked Asterisk server');
   }
 
+  if (process.env.NODE_ENV === 'development') {
+    return `http://server:${userServer.web_port}`;
+  }
   return `http://${userServer.ip}:${userServer.web_port}`;
 };
 

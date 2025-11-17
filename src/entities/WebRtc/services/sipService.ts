@@ -67,9 +67,11 @@ class SipService {
       });
   }
 
-  async makeCall(phone: string, listener: (state: string) => void, callerId?: string | null) {
-    const extraHeaders: string[] = [];
-    
+  async makeCall(phone: string, listener: (state: string) => void, callerId?: string | null, args?: string[]) {
+    const extraHeaders = args || [];
+    if (process.env.NODE_ENV === 'development') {
+      extraHeaders.push('X-app: test');
+    }
     // Добавляем Caller ID в SIP headers если передан
     if (callerId) {
       extraHeaders.push(`P-Asserted-Identity: <sip:${callerId}@${this.host}>`);

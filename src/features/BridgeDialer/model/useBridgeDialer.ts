@@ -203,6 +203,7 @@ export const useBridgeDialer = (): UseBridgeDialerResult => {
 
       const updatedBridge: BridgeSession = {
         ...bridgeSession,
+        creator_user_id: sessionRecord.creator_user_id ?? bridgeSession.creator_user_id,
         join_extension: sessionRecord.join_extension ?? bridgeSession.join_extension,
         metadata: {
           ...(bridgeSession.metadata || {}),
@@ -250,6 +251,7 @@ export const useBridgeDialer = (): UseBridgeDialerResult => {
 
       dispatch(setBridgeSession({
         ...bridgeResponse.data.bridge,
+        creator_user_id: storedSession.data.session.creator_user_id,
         join_extension: storedSession.data.session.join_extension,
         metadata: mergedMetadata,
       }));

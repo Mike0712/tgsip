@@ -6,6 +6,9 @@ import {
   updateCallSessionStatus,
   upsertCallSessionParticipant,
 } from '@/lib/callSessions';
+import { getDb } from '@/lib/db';
+import type { Knex } from 'knex';
+import { callAsterisk } from '@/pages/api/ariProxy';
 
 interface TelephonyEventPayload {
   event?: string;
@@ -27,77 +30,14 @@ const ipAuthWrapper = (handler: any) => async (req: any, res: any) => {
   return handler(req, res);
 };
 
-const extractPayload = (body: any): TelephonyEventPayload | null => {
-  if (!body) return null;
-
-  const parseJson = (value: string) => {
-    try {
-      return JSON.parse(value);
-    } catch (error) {
-      console.error('[telephony/events] Failed to parse JSON payload', error, value);
-      return null;
-    }
-  };
-
-  if (typeof body === 'string') {
-    const trimmed = body.trim();
-    if (!trimmed) return null;
-
-    if (trimmed.startsWith('{')) {
-      return parseJson(trimmed);
-    }
-
-    // Handle forms like channel_info=...
-    const [key, ...rest] = trimmed.split('=');
-    if (key && rest.length > 0) {
-      const joined = rest.join('=');
-      const decoded = decodeURIComponent(joined);
-      if (key === 'channel_info' || key === 'payload') {
-        return parseJson(decoded);
-      }
-
-      if (decoded.startsWith('{')) {
-        return parseJson(decoded);
-      }
-    }
-
-    return null;
-  }
-
-  if (typeof body === 'object') {
-    const keys = Object.keys(body);
-
-    if ('event' in body) {
-      return body as TelephonyEventPayload;
-    }
-
-    if (typeof body.channel_info === 'string') {
-      return parseJson(body.channel_info);
-    }
-
-    if (typeof body.payload === 'string') {
-      return parseJson(body.payload);
-    }
-
-    if (keys.length === 1 && keys[0]?.trim().startsWith('{')) {
-      const parsed = parseJson(keys[0]);
-      if (parsed) {
-        return parsed;
-      }
-    }
-  }
-
-  return null;
-};
-
 const eventsHandler = async (req: AuthenticatedRequest, res: NextApiResponse) => {
   if (req.method !== 'POST') {
     return res.status(405).json({ success: false, error: 'Method not allowed' });
   }
 
-  const payload = extractPayload(req.body);
+  const payload = req.body;
 
-  if (!payload) {
+  if (!payload) { 
     return res.status(400).json({ success: false, error: 'Invalid payload' });
   }
 
@@ -108,7 +48,7 @@ const eventsHandler = async (req: AuthenticatedRequest, res: NextApiResponse) =>
   }
 
   let bridgeId = payload.bridge_id;
-  let session = null;
+  let session: any = null;
 
   try {
     if (bridgeId) {
@@ -150,13 +90,32 @@ const eventsHandler = async (req: AuthenticatedRequest, res: NextApiResponse) =>
     switch (event) {
       case 'bridge_join':
       case 'participant_joined': {
-        await upsertCallSessionParticipant({
-          sessionId: session.id,
-          endpoint: payload.endpoint || payload.caller || payload.uniqueid || 'unknown',
-          status: payload.status || 'joined',
-          metadata: payload.metadata,
-        });
-        await updateCallSessionStatus(session.id, 'active');
+        // let addedToBridge = false;
+        // try {
+        //   const channel = payload.uniqueid as string | undefined;
+        //   if (bridgeId && channel) {
+        //     if (session.creator_user_id) {
+        //       await callAsterisk(`/api/ari/bridges/${bridgeId}/add`, {
+        //         method: 'POST',
+        //         body: { channel, role: 'participant' },
+        //         userId: session.creator_user_id,
+        //       });
+        //       addedToBridge = true;
+        //     }
+        //   }
+        // } catch (e) {
+        //   console.error('[telephony/events] Error calling ARI add participant', e);
+        // }
+
+        // if (addedToBridge) {
+          await upsertCallSessionParticipant({
+            sessionId: session.id,
+            endpoint: payload.endpoint || payload.caller || payload.uniqueid || 'unknown',
+            status: payload.status || 'joined',
+            metadata: payload.metadata,
+          });
+          await updateCallSessionStatus(session.id, 'active');
+        // }
         break;
       }
 

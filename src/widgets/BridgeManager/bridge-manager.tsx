@@ -110,6 +110,7 @@ const BridgeManager: React.FC = () => {
         dialTarget,
         () => {},
         selectedAccount.sip_username,
+        [`X-bridgeId: ${bridgeSession.id}`],
       );
       showAlert('Звонок инициирован', `Подключение к сессии через ${dialTarget}`, 'success');
     } catch (error) {
@@ -221,7 +222,7 @@ const BridgeManager: React.FC = () => {
       {deepLink && (
         <div className="mb-3">
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Ссылка для Telegram бота:
+            Ссылка для Telegram:
           </label>
           <div className="flex gap-2">
             <input
@@ -315,25 +316,27 @@ const BridgeManager: React.FC = () => {
             >
               Присоединиться к сессии
             </button>
-            <div className="flex gap-2">
-              <button
-                onClick={handleEnd}
-                disabled={isProcessing || bridgeStatus === 'terminating'}
-                className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isProcessing || bridgeStatus === 'terminating'
-                    ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                    : 'bg-red-600 text-white hover:bg-red-700'
-                  }`}
-              >
-                Завершить сессию
-              </button>
-              <button
-                onClick={handleReset}
-                disabled={isProcessing}
-                className="flex-1 px-4 py-2 rounded-lg text-sm font-medium border border-gray-300 text-gray-600 hover:bg-gray-100"
-              >
-                Сбросить
-              </button>
-            </div>
+            {user?.id && bridgeSession?.creator_user_id && user.id === bridgeSession.creator_user_id && (
+              <div className="flex gap-2">
+                <button
+                  onClick={handleEnd}
+                  disabled={isProcessing || bridgeStatus === 'terminating'}
+                  className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isProcessing || bridgeStatus === 'terminating'
+                      ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                      : 'bg-red-600 text-white hover:bg-red-700'
+                    }`}
+                >
+                  Завершить сессию
+                </button>
+                <button
+                  onClick={handleReset}
+                  disabled={isProcessing}
+                  className="flex-1 px-4 py-2 rounded-lg text-sm font-medium border border-gray-300 text-gray-600 hover:bg-gray-100"
+                >
+                  Сбросить
+                </button>
+              </div>
+            )}
           </div>
 
           {bridgeParticipants.length > 0 && (

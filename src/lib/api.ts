@@ -129,7 +129,8 @@ interface BridgeParticipant {
 
 interface BridgeSession {
   id: string;
-  creator_id: number;
+  creator_id?: number;
+  creator_user_id?: number | null;
   status: 'pending' | 'active' | 'completed' | 'failed' | 'terminated';
   target?: string;
   metadata?: Record<string, unknown>;
