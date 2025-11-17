@@ -70,6 +70,7 @@ const mapParticipantRecords = (participants: CallSessionParticipantRecord[]) => 
       (participantMeta?.display_name as string)
         ?? participant.endpoint,
     status: participant.status ?? 'pending',
+    user_id: participant.user_id,
     created_at: participant.created_at,
     updated_at: participant.updated_at,
     metadata: participantMeta,

@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef } from 'react';
-import { useSelector } from 'react-redux';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '@/app/store';
 import { useBridgeDialer } from '@/features/BridgeDialer/model/useBridgeDialer';
 import { useAlert } from '@/shared/lib/hooks/useAlert';
@@ -9,6 +9,10 @@ import { useAuth } from '@/hooks/useAuth';
 import { useSearchParams } from 'next/navigation';
 import { getSipServiceInstance } from '@/entities/WebRtc/services/sipServiceInstance';
 import { BridgeSession } from '@/lib/api';
+import { setCallStatus, setSessionState } from '@/entities/WebRtc/model/slice';
+import store from '@/app/store';
+import { BridgeParticipantsList } from './bridge-participants-list';
+import { BridgeShareBlock } from './bridge-share-block';
 
 const formatStatus = (status: ReturnType<typeof useBridgeDialer>['bridgeStatus']) => {
   switch (status) {
@@ -28,7 +32,10 @@ const formatStatus = (status: ReturnType<typeof useBridgeDialer>['bridgeStatus']
 };
 
 const BridgeManager: React.FC = () => {
+  const dispatch = useDispatch();
   const selectedAccount = useSelector((state: RootState) => state.sip.selectedAccount);
+  const sessionState = useSelector((state: RootState) => state.sip.sessionState);
+  const callStatus = useSelector((state: RootState) => state.sip.callStatus);
   const {
     bridgeSession,
     bridgeParticipants,
@@ -44,6 +51,18 @@ const BridgeManager: React.FC = () => {
   const { showAlert } = useAlert();
   const { user } = useAuth();
   const searchParams = useSearchParams();
+  const [isConnecting, setIsConnecting] = useState(false);
+
+  // Проверяем, находится ли текущий пользователь в разговоре
+  const isUserInCall = useMemo(() => {
+    if (!user?.id || !bridgeParticipants.length) {
+      return false;
+    }
+    const isParticipantJoined = bridgeParticipants.some(
+      (participant) => participant.user_id === user.id && participant.status === 'joined'
+    );
+    return sessionState === 'Established' && isParticipantJoined;
+  }, [user?.id, bridgeParticipants, sessionState]);
   // Получаем bridge ID из параметра 'startapp' (URL) или start_param (deep link ?start=...)
   const bridgeParamFromStartApp = searchParams?.get('startapp');
   const bridgeParamFromStartParam = (() => {
@@ -106,15 +125,30 @@ const BridgeManager: React.FC = () => {
     }
 
     try {
+      setIsConnecting(true);
+      dispatch(setCallStatus('connecting'));
+
+      const stateListener = (state: string) => {
+        store.dispatch(setSessionState(state));
+        if (state === 'Established') {
+          setIsConnecting(false);
+          dispatch(setCallStatus('active'));
+        } else if (state === 'Terminated' || state === 'Canceled') {
+          setIsConnecting(false);
+          dispatch(setCallStatus('idle'));
+        }
+      };
+
       await sipService.makeCall(
         dialTarget,
-        () => {},
+        stateListener,
         selectedAccount.sip_username,
         [`X-bridgeId: ${bridgeSession.id}`],
       );
-      showAlert('Звонок инициирован', `Подключение к сессии через ${dialTarget}`, 'success');
     } catch (error) {
       console.error('Failed to dial bridge extension:', error);
+      setIsConnecting(false);
+      dispatch(setCallStatus('idle'));
       showAlert('Ошибка звонка', 'Не удалось инициировать звонок. Попробуй ещё раз.', 'error');
     }
   };
@@ -148,6 +182,16 @@ const BridgeManager: React.FC = () => {
       isLoadingSession.current = false;
     });
   }, [bridgeParam, bridgeSession, loadSession]);
+
+  // Сбрасываем состояние подключения при завершении звонка
+  useEffect(() => {
+    if (sessionState === 'Terminated' || sessionState === 'Canceled') {
+      setIsConnecting(false);
+      if (callStatus === 'connecting') {
+        dispatch(setCallStatus('idle'));
+      }
+    }
+  }, [sessionState, callStatus, dispatch]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -208,62 +252,6 @@ const BridgeManager: React.FC = () => {
     resetBridgeState();
   };
 
-  const handleCopy = (value: string, message: string) => {
-    if (!value) return;
-    navigator.clipboard.writeText(value).then(() => {
-      showAlert('Ссылка скопирована', message, 'success');
-    }).catch(() => {
-      showAlert('Ошибка', 'Не удалось скопировать ссылку', 'error');
-    });
-  };
-
-  const renderShareBlock = () => (
-    <>
-      {deepLink && (
-        <div className="mb-3">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Ссылка для Telegram:
-          </label>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              readOnly
-              value={deepLink}
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm"
-            />
-            <button
-              onClick={() => handleCopy(deepLink, 'Deep link скопирован в буфер обмена')}
-              className="px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 text-sm"
-            >
-              Копировать
-            </button>
-          </div>
-        </div>
-      )}
-
-      {appLink && (
-        <div className="mb-3">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Прямая ссылка на MiniPhone:
-          </label>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              readOnly
-              value={appLink}
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm"
-            />
-            <button
-              onClick={() => handleCopy(appLink, 'Ссылка на MiniPhone скопирована')}
-              className="px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 text-sm"
-            >
-              Копировать
-            </button>
-          </div>
-        </div>
-      )}
-    </>
-  );
 
   return (
     <div className="mb-6 p-4 bg-white rounded-lg border border-gray-200 shadow-sm space-y-4">
@@ -293,7 +281,7 @@ const BridgeManager: React.FC = () => {
 
       {bridgeSession && (
         <>
-          <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700">
+          {!isUserInCall && <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700">
             <div className="flex items-center justify-between">
               <span className="font-medium">ID сессии</span>
               <code className="text-xs text-gray-500">{bridgeSession.id}</code>
@@ -301,22 +289,29 @@ const BridgeManager: React.FC = () => {
             {bridgeSession.target && (
               <p className="mt-2 text-xs text-gray-500">Target: {bridgeSession.target}</p>
             )}
-          </div>
+          </div>}
 
-          {renderShareBlock()}
+          {!isUserInCall && <BridgeShareBlock deepLink={deepLink} appLink={appLink} />}
 
           <div className="space-y-2">
-            <button
-              onClick={handleJoin}
-              disabled={isProcessing || ['terminating', 'completed', 'failed'].includes(bridgeStatus)}
-              className={`w-full px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isProcessing || ['terminating', 'completed', 'failed'].includes(bridgeStatus)
-                  ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                  : 'bg-green-600 text-white hover:bg-green-700'
-                }`}
-            >
-              Присоединиться к сессии
-            </button>
-            {user?.id && bridgeSession?.creator_user_id && user.id === bridgeSession.creator_user_id && (
+            {isConnecting || callStatus === 'connecting' ? (
+              <div className="w-full px-4 py-2 rounded-lg text-sm font-medium bg-blue-50 border border-blue-200 text-blue-700 flex items-center justify-center gap-2">
+                <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                <span>Подключение...</span>
+              </div>
+            ) : (
+              <button
+                onClick={handleJoin}
+                disabled={isProcessing || ['terminating', 'completed', 'failed'].includes(bridgeStatus) || isUserInCall}
+                className={`w-full px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isProcessing || ['terminating', 'completed', 'failed'].includes(bridgeStatus) || isUserInCall
+                    ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                    : 'bg-green-600 text-white hover:bg-green-700'
+                  }`}
+              >
+                {isUserInCall ? 'В разговоре' : 'Присоединиться к сессии'}
+              </button>
+            )}
+            {user?.id && bridgeSession?.creator_user_id && user.id === bridgeSession.creator_user_id && !isUserInCall && (
               <div className="flex gap-2">
                 <button
                   onClick={handleEnd}
@@ -338,25 +333,7 @@ const BridgeManager: React.FC = () => {
               </div>
             )}
           </div>
-
-          {bridgeParticipants.length > 0 && (
-            <div className="mt-3">
-              <h4 className="text-sm font-medium text-gray-700 mb-2">Участники</h4>
-              <ul className="space-y-2">
-                {bridgeParticipants.map((participant) => (
-                  <li
-                    key={participant.id}
-                    className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-600 flex justify-between"
-                  >
-                    <span>{participant.display_name || participant.reference}</span>
-                    <span>{participant.status}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          
+          {bridgeParticipants.length > 0 && isUserInCall && <BridgeParticipantsList participants={bridgeParticipants} />}
         </>
       )}
     </div>

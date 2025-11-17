@@ -37,10 +37,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     let hash = '';
     let query_id: string | undefined;
     
-    // В dev режиме берем пользователя напрямую из body или initData
     if (isDev) {
       if (userFromBody) {
-        // Если передали user напрямую в body
         try {
           parsedUser = typeof userFromBody === 'string' ? JSON.parse(userFromBody) : userFromBody;
           auth_date = String(Math.floor(Date.now() / 1000));
@@ -50,13 +48,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           return res.status(400).json({ error: 'Invalid user data in dev mode' });
         }
       } else if (initData) {
-        // Если передали как строку (из URL параметра)
         try {
           parsedUser = typeof initData === 'string' ? JSON.parse(initData) : initData;
           auth_date = String(Math.floor(Date.now() / 1000));
           hash = 'dev_mode';
         } catch (error) {
-          // Если не JSON, пробуем как URLSearchParams
           const urlParams = new URLSearchParams(initData);
           const userStr = urlParams.get('user');
           if (userStr) {
@@ -71,12 +67,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ error: 'Telegram user data is required' });
       }
     } else {
-      // В production используем стандартный initData
       if (!initData) {
         return res.status(400).json({ error: 'Telegram init data is required' });
       }
 
-      // Парсим данные от Telegram WebApp: важные ключи: user (JSON), auth_date, hash, query_id
       const urlParams = new URLSearchParams(initData);
       const userStr = urlParams.get('user');
       auth_date = urlParams.get('auth_date') || '';
@@ -105,8 +99,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
     
     if (!isDev && botToken) {
-      // Парсим initData вручную, чтобы сохранить оригинальные значения
-      // Telegram может отправлять URL-encoded значения
       const params: Record<string, string> = {};
       const pairs = initData.split('&');
       for (const pair of pairs) {

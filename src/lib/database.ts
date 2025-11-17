@@ -187,6 +187,10 @@ export const sipAccountService = {
     return await db('sip_accounts').where('user_id', userId).where('is_active', true);
   },
 
+  async findBySipUsername(sipUsername: string): Promise<SipAccount | null> {
+    return await db('sip_accounts').where('sip_username', sipUsername).where('is_active', true).first();
+  },
+
   async create(userId: number, sipData: Partial<SipAccount>): Promise<SipAccount> {
     const [account] = await db('sip_accounts').insert({
       user_id: userId,

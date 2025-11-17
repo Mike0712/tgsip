@@ -122,6 +122,7 @@ interface BridgeParticipant {
   reference: string;
   display_name?: string;
   status: 'pending' | 'dialing' | 'joined' | 'failed' | 'left';
+  user_id?: number | null;
   created_at: string;
   updated_at: string;
   metadata?: Record<string, unknown>;
@@ -451,6 +452,13 @@ class ApiClient {
     }
 
     return this.request<{ users: UserSummary[] }>(`/users/search?${params.toString()}`);
+  }
+
+  async getUsersByIds(userIds: number[]): Promise<ApiResponse<{ users: UserSummary[] }>> {
+    return this.request<{ users: UserSummary[] }>('/users/batch', {
+      method: 'POST',
+      body: JSON.stringify({ userIds }),
+    });
   }
 
   async sendInviteMessage(payload: { telegram_id: string; link: string; message?: string }): Promise<ApiResponse<{ success: boolean }>> {

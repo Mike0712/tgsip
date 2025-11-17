@@ -9,6 +9,7 @@ import {
 import { getDb } from '@/lib/db';
 import type { Knex } from 'knex';
 import { callAsterisk } from '@/pages/api/ariProxy';
+import { sipAccountService } from '@/lib/database';
 
 interface TelephonyEventPayload {
   event?: string;
@@ -37,7 +38,7 @@ const eventsHandler = async (req: AuthenticatedRequest, res: NextApiResponse) =>
 
   const payload = req.body;
 
-  if (!payload) { 
+  if (!payload) {
     return res.status(400).json({ success: false, error: 'Invalid payload' });
   }
 
@@ -86,36 +87,19 @@ const eventsHandler = async (req: AuthenticatedRequest, res: NextApiResponse) =>
     if (!session) {
       return res.status(404).json({ success: false, error: 'Session not found' });
     }
-
+    console.log('payload', payload);
     switch (event) {
       case 'bridge_join':
       case 'participant_joined': {
-        // let addedToBridge = false;
-        // try {
-        //   const channel = payload.uniqueid as string | undefined;
-        //   if (bridgeId && channel) {
-        //     if (session.creator_user_id) {
-        //       await callAsterisk(`/api/ari/bridges/${bridgeId}/add`, {
-        //         method: 'POST',
-        //         body: { channel, role: 'participant' },
-        //         userId: session.creator_user_id,
-        //       });
-        //       addedToBridge = true;
-        //     }
-        //   }
-        // } catch (e) {
-        //   console.error('[telephony/events] Error calling ARI add participant', e);
-        // }
-
-        // if (addedToBridge) {
-          await upsertCallSessionParticipant({
-            sessionId: session.id,
-            endpoint: payload.endpoint || payload.caller || payload.uniqueid || 'unknown',
-            status: payload.status || 'joined',
-            metadata: payload.metadata,
-          });
-          await updateCallSessionStatus(session.id, 'active');
-        // }
+        const userAccount = await sipAccountService.findBySipUsername(payload.caller);
+        await upsertCallSessionParticipant({
+          sessionId: session.id,
+          userId: userAccount?.user_id || null,
+          endpoint: payload.endpoint || payload.caller || payload.uniqueid || 'unknown',
+          status: payload.status || 'joined',
+          metadata: payload.metadata,
+        });
+        await updateCallSessionStatus(session.id, 'active');
         break;
       }
 
