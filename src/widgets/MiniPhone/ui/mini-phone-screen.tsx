@@ -10,6 +10,7 @@ import { AlertProvider } from '@/shared/lib/hooks/useAlert';
 import { AlertContainer } from '@/shared/lib/AlertContainer';
 import { AuthErrorScreen } from '@/features/AuthError/ui/AuthErrorScreen';
 import { BridgeManager } from '@/widgets/BridgeManager';
+import FriendlyRetryScreen from '@/features/AuthError/ui/FriendlyRetryScreen';
 
 const connectingSessionStates = new Set(['Establishing', 'Established']);
 const connectingInviteStates = new Set(['creating', 'waiting', 'connecting', 'ready', 'active']);
@@ -91,9 +92,8 @@ const MiniPhoneScreen: React.FC = () => {
   if (controller.authError) {
     return (
       <AlertProvider>
-        <AuthErrorScreen
-          authError={controller.authError}
-          onRetry={controller.handleRetryAuth}
+        <FriendlyRetryScreen
+          errorMsg={controller.authError}
           onRegistrationSuccess={controller.handleRegistrationSuccess}
         />
         <AlertContainer />
