@@ -128,7 +128,7 @@ const MiniPhoneScreen: React.FC = () => {
             <p className="text-xs text-green-600 text-center -mt-3 mb-4">✅ Аутентифицирован</p>
           )}
 
-          {shouldShowAudioButton && <AudioButton />}
+          {/* {shouldShowAudioButton && <AudioButton />} */}
           
           {controller.canUseDialer && (
             <ViewSwitcher activeView={controller.activeView} onChange={controller.setActiveView} />

@@ -9,16 +9,36 @@ import PhoneHandsetHangupIcon from '@/shared/ui/icons/hangup';
 
 interface BridgeParticipantsListProps {
   participants: BridgeParticipant[];
-  onHangup: () => void;
+  onHangup?: () => void;
+  showVolume?: boolean;
+  onVolume?: () => void;
 }
 
 interface ParticipantWithUser extends BridgeParticipant {
   user?: UserSummary;
 }
 
-export const BridgeParticipantsList: React.FC<BridgeParticipantsListProps> = ({ participants }) => {
+function isMobileDevice() {
+  if (typeof navigator === 'undefined') return false;
+  return /android|iphone|ipad|ipod|mobile|ios|blackberry|iemobile|opera mini/i.test(navigator.userAgent);
+}
+
+const VolumeButton: React.FC<{ onVolume?: () => void }> = ({ onVolume }) => (
+  <div className="flex justify-center mt-4">
+    <button
+      className="bg-blue-500 hover:bg-blue-600 transition-colors w-12 h-12 flex items-center justify-center rounded-full shadow-lg"
+      title="Переключить громкость"
+      onClick={onVolume}
+    >
+      <span role="img" aria-label="volume">🔊</span>
+    </button>
+  </div>
+);
+
+export const BridgeParticipantsList: React.FC<BridgeParticipantsListProps> = ({ participants, showVolume, onVolume, onHangup }) => {
   const [users, setUsers] = useState<Map<number, UserSummary>>(new Map());
   const dispatch = useDispatch();
+  const mobile = isMobileDevice();
 
   const userIds = useMemo(() => {
     return participants
@@ -73,12 +93,12 @@ export const BridgeParticipantsList: React.FC<BridgeParticipantsListProps> = ({ 
   if (participants.length === 0) {
     return null;
   }
-
   return (
     <div className="mt-3">
       <h4 className="text-sm font-medium text-gray-700 mb-3">Участники</h4>
+      {showVolume && mobile && <VolumeButton onVolume={onVolume} />}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        {participantsWithUsers.map((participant) => (
+        {participantsWithUsers.filter((participant) => participant.status === 'joined').map((participant) => (
           <div
             key={participant.id}
             className="flex flex-col items-center p-4 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl shadow-sm hover:shadow-md transition-shadow"
@@ -107,12 +127,12 @@ export const BridgeParticipantsList: React.FC<BridgeParticipantsListProps> = ({ 
           </div>
         ))}
       </div>
-      {/* Hangup button at the bottom */}
+      {/* Hangup button — отдельно, реагирует на onHangup если он передан */}
       <div className="flex justify-center mt-8">
         <button
           className="bg-red-600 hover:bg-red-700 transition-colors w-14 h-14 flex items-center justify-center rounded-full shadow-lg"
           title="Завершить звонок"
-          onClick={() => dispatch(setHangup(true))}
+          onClick={onHangup ? onHangup : () => dispatch(setHangup(true))}
         >
           <PhoneHandsetHangupIcon size={28} color="white" />
         </button>

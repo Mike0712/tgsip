@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useSelector } from 'react-redux';
 import store, { RootState } from "@/app/store";
 import SipService from '../../services/sipService';
@@ -7,6 +7,11 @@ import { setSipServiceInstance } from '../../services/sipServiceInstance';
 import cls from './sip-status.module.css';
 
 let sipService: SipService | null = null;
+
+function isMobileDevice() {
+  if (typeof navigator === 'undefined') return false;
+  return /android|iphone|ipad|ipod|mobile|ios|blackberry|iemobile|opera mini/i.test(navigator.userAgent);
+}
 
 const SipStatus = () => {
   const status = useSelector((state: RootState) => state.sip.status);
@@ -59,6 +64,18 @@ const SipStatus = () => {
     }
   }, [hangup]);
 
+  const [speakerOn, setSpeakerOn] = useState(true);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const mobile = isMobileDevice();
+
+  useEffect(() => {
+    if (audioRef.current) {
+      // Просто управление громкостью (1 — громкая, 0.2 — "наушник", хоть примерно)
+      audioRef.current.volume = speakerOn ? 1 : 0.2;
+      audioRef.current.muted = false;
+    }
+  }, [speakerOn]);
+
   return (
     <div className={cls.sipStatus}>
       <span className={status === 'online' ? cls.online : cls.offline}>
@@ -69,8 +86,22 @@ const SipStatus = () => {
           {selectedAccount.sip_username}@{selectedAccount.sip_server}
         </div>
       )}
+      {mobile && (
+        <button
+          style={{
+            margin: '12px 0',
+            padding: '7px 14px',
+            borderRadius: 6,
+            border: '1px solid #ccc',
+          }}
+          onClick={() => setSpeakerOn((prev) => !prev)}
+        >
+          {speakerOn ? '🔊 Громкая связь' : '🦻 В наушник'}
+        </button>
+      )}
       <audio
         id="mediaElement"
+        ref={audioRef}
         autoPlay
         playsInline
       />
