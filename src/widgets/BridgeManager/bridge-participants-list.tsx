@@ -2,9 +2,14 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import { BridgeParticipant, apiClient, UserSummary } from '@/lib/api';
+import { XIcon } from '@heroicons/react/solid';
+import { useDispatch } from 'react-redux';
+import { setHangup } from '@/entities/WebRtc/model/slice';
+import PhoneHandsetHangupIcon from '@/shared/ui/icons/hangup';
 
 interface BridgeParticipantsListProps {
   participants: BridgeParticipant[];
+  onHangup: () => void;
 }
 
 interface ParticipantWithUser extends BridgeParticipant {
@@ -13,6 +18,7 @@ interface ParticipantWithUser extends BridgeParticipant {
 
 export const BridgeParticipantsList: React.FC<BridgeParticipantsListProps> = ({ participants }) => {
   const [users, setUsers] = useState<Map<number, UserSummary>>(new Map());
+  const dispatch = useDispatch();
 
   const userIds = useMemo(() => {
     return participants
@@ -100,6 +106,16 @@ export const BridgeParticipantsList: React.FC<BridgeParticipantsListProps> = ({ 
             </div>
           </div>
         ))}
+      </div>
+      {/* Hangup button at the bottom */}
+      <div className="flex justify-center mt-8">
+        <button
+          className="bg-red-600 hover:bg-red-700 transition-colors w-14 h-14 flex items-center justify-center rounded-full shadow-lg"
+          title="Завершить звонок"
+          onClick={() => dispatch(setHangup(true))}
+        >
+          <PhoneHandsetHangupIcon size={28} color="white" />
+        </button>
       </div>
     </div>
   );

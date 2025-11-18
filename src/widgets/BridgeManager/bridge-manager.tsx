@@ -113,7 +113,7 @@ const BridgeManager: React.FC = () => {
 
     const sipService = getSipServiceInstance();
     if (!sipService) {
-      showAlert('SIP недоступен', 'Переподключи SIP перед присоединением.', 'warning');
+      showAlert('SIP недоступен', 'Переподключите SIP перед присоединением.', 'warning');
       return;
     }
 
@@ -150,6 +150,15 @@ const BridgeManager: React.FC = () => {
       setIsConnecting(false);
       dispatch(setCallStatus('idle'));
       showAlert('Ошибка звонка', 'Не удалось инициировать звонок. Попробуй ещё раз.', 'error');
+    }
+  };
+
+  const handleHangup = () => {
+    const sipService = getSipServiceInstance();
+    if (sipService) {
+      sipService.hangup();
+    } else {
+      console.warn('SIP service unavailable (no instance)');
     }
   };
 
@@ -333,7 +342,7 @@ const BridgeManager: React.FC = () => {
               </div>
             )}
           </div>
-          {bridgeParticipants.length > 0 && isUserInCall && <BridgeParticipantsList participants={bridgeParticipants} />}
+          {bridgeParticipants.length > 0 && isUserInCall && <BridgeParticipantsList participants={bridgeParticipants} onHangup={handleHangup} />}
         </>
       )}
     </div>
