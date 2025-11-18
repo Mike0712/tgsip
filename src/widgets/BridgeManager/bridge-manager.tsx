@@ -82,7 +82,7 @@ const BridgeManager: React.FC = () => {
 
   const deepLink = useMemo(() => {
     if (!bridgeSession || !botUsername) return null;
-    return `https://t.me/${botUsername}?start=${bridgeSession.id}`;
+    return `https://t.me/${botUsername}?startapp=${bridgeSession.id}`;
   }, [bridgeSession, botUsername]);
 
   const appLink = useMemo(() => {

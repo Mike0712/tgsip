@@ -242,7 +242,7 @@ const InviteManager = () => {
       const link = `${normalizedBase}/miniphone?invite=${invite.token}`;
 
       if (botUsername) {
-        setBotDeepLink(`https://t.me/${botUsername}?start=${invite.token}`);
+        setBotDeepLink(`https://t.me/${botUsername}?startapp=${invite.token}`);
       }
 
       const sendResponse = await apiClient.sendInviteMessage({
