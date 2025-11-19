@@ -8,8 +8,8 @@ import {
 } from '@/lib/callSessions';
 import { getDb } from '@/lib/db';
 import type { Knex } from 'knex';
-import { callAsterisk } from '@/pages/api/ariProxy';
 import { sipAccountService } from '@/lib/database';
+import { sseClient } from '../../api/sseClient';
 
 interface TelephonyEventPayload {
   event?: string;
@@ -87,26 +87,41 @@ const eventsHandler = async (req: AuthenticatedRequest, res: NextApiResponse) =>
     if (!session) {
       return res.status(404).json({ success: false, error: 'Session not found' });
     }
-    console.log('payload', payload);
+
     switch (event) {
       case 'bridge_join':
       case 'participant_joined': {
         const userAccount = await sipAccountService.findBySipUsername(payload.caller);
-        await upsertCallSessionParticipant({
+        const participant = await upsertCallSessionParticipant({
           sessionId: session.id,
-          userId: userAccount?.user_id || null,
+          userId: userAccount?.user_id,
           endpoint: payload.endpoint || payload.caller || payload.uniqueid || 'unknown',
           status: payload.status || 'joined',
           metadata: payload.metadata,
         });
         await updateCallSessionStatus(session.id, 'active');
+        await sseClient(`/pushEvent`, {
+          method: 'POST',
+          body: JSON.stringify({
+            event: 'participant_joined',
+            sessionId: session.id,
+            payload: {
+              participant
+            },
+          }),
+        });
         break;
       }
 
       case 'participant_left':
       case 'bridge_left': {
+        const userAccount = await sipAccountService.findBySipUsername(payload.caller);
+        if (!userAccount) {
+          return res.status(404).json({ success: false, error: 'User not found' });
+        }
         await upsertCallSessionParticipant({
           sessionId: session.id,
+          userId: userAccount?.user_id,
           endpoint: payload.endpoint || payload.caller || payload.uniqueid || 'unknown',
           status: 'left',
           metadata: payload.metadata,

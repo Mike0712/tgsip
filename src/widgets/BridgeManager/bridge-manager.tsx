@@ -13,6 +13,7 @@ import { setCallStatus, setSessionState } from '@/entities/WebRtc/model/slice';
 import store from '@/app/store';
 import { BridgeParticipantsList } from './bridge-participants-list';
 import { BridgeShareBlock } from './bridge-share-block';
+import { useSSE } from '@/hooks/useSSE';
 
 const formatStatus = (status: ReturnType<typeof useBridgeDialer>['bridgeStatus']) => {
   switch (status) {
@@ -63,19 +64,26 @@ const BridgeManager: React.FC = () => {
     );
     return sessionState === 'Established' && isParticipantJoined;
   }, [user?.id, bridgeParticipants, sessionState]);
-  // Получаем bridge ID из параметра 'startapp' (URL) или start_param (deep link ?start=...)
   const bridgeParamFromStartApp = searchParams?.get('startapp');
   const bridgeParamFromStartParam = (() => {
     if (typeof window === 'undefined') return null;
     const tg = window.Telegram?.WebApp;
     return tg?.initDataUnsafe?.start_param || null;
   })();
+
+  useSSE({
+    sessionId: bridgeSession?.id || '',
+    userId: user?.id?.toString() || '',
+    handlers: {
+      'participant_joined': (event: MessageEvent) => {
+        refreshSession();
+      },
+    },
+  });
   
-  // Приоритет: startapp (если бот передал в URL) > start_param (если перешли по ?start=...)
   const bridgeParam = bridgeParamFromStartApp || bridgeParamFromStartParam;
   const hasLoadedFromLink = useRef<string | null>(null);
   const isLoadingSession = useRef(false);
-  const refreshAttempts = useRef(0);
   const isRefreshing = useRef(false);
 
   const botUsername = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME;
@@ -185,7 +193,6 @@ const BridgeManager: React.FC = () => {
       isLoadingSession.current = false;
       if (success) {
         hasLoadedFromLink.current = bridgeParam;
-        refreshAttempts.current = 0; // Сбрасываем счетчик при успешной загрузке
       }
     }).catch(() => {
       isLoadingSession.current = false;
@@ -215,43 +222,20 @@ const BridgeManager: React.FC = () => {
       return;
     }
 
-    // Ограничиваем количество попыток до 3
-    if (refreshAttempts.current >= 3) {
-      return;
-    }
-
     let cancelled = false;
 
     const tick = async () => {
       if (cancelled || isRefreshing.current) {
         return;
-      }
-      
-      isRefreshing.current = true;
-      refreshAttempts.current += 1;
-      
-      try {
-        await refreshSession();
-      } finally {
-        isRefreshing.current = false;
-      }
+      }      
     };
 
     void tick();
 
-    const intervalId = window.setInterval(() => {
-      if (refreshAttempts.current >= 3) {
-        window.clearInterval(intervalId);
-        return;
-      }
-      void tick();
-    }, 5000);
-
     return () => {
       cancelled = true;
-      window.clearInterval(intervalId);
     };
-  }, [bridgeSession?.id, bridgeStatus, refreshSession]);
+  }, [bridgeSession?.id, bridgeStatus]);
 
   const handleEnd = async () => {
     await endBridge();

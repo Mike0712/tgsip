@@ -90,7 +90,7 @@ export const updateCallSessionStatus = async (
 
 interface UpsertParticipantParams {
   sessionId: number;
-  userId?: number | null;
+  userId?: number;
   endpoint: string;
   role?: 'initiator' | 'participant';
   status?: 'pending' | 'dialing' | 'joined' | 'failed' | 'left';
@@ -99,7 +99,7 @@ interface UpsertParticipantParams {
 
 export const upsertCallSessionParticipant = async ({
   sessionId,
-  userId = null,
+  userId,
   endpoint,
   role = 'participant',
   status = 'pending',
@@ -112,6 +112,7 @@ export const upsertCallSessionParticipant = async ({
         .where({ session_id: sessionId, user_id: userId })
         .first()
     : null;
+  console.log('existing', userId, existing, sessionId);
 
   const timestamps: Record<string, unknown> = {
     updated_at: db.fn.now(),

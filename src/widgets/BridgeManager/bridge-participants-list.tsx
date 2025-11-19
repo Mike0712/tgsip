@@ -98,7 +98,7 @@ export const BridgeParticipantsList: React.FC<BridgeParticipantsListProps> = ({ 
       <h4 className="text-sm font-medium text-gray-700 mb-3">Участники</h4>
       {showVolume && mobile && <VolumeButton onVolume={onVolume} />}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        {participantsWithUsers.filter((participant) => participant.status === 'joined').map((participant) => (
+        {participantsWithUsers.map((participant) => (
           <div
             key={participant.id}
             className="flex flex-col items-center p-4 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl shadow-sm hover:shadow-md transition-shadow"
