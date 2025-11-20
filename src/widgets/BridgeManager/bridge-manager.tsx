@@ -81,7 +81,6 @@ const BridgeManager: React.FC = () => {
 
   const deepLink = useMemo(() => {
     if (!bridgeSession || !botUsername) return null;
-    subscribe('participant_joined', bridgeSession.id);
     return `https://t.me/${botUsername}?startapp=${bridgeSession.id}`;
   }, [bridgeSession, botUsername]);
 
@@ -162,34 +161,42 @@ const BridgeManager: React.FC = () => {
     }
   };
 
+  // --- ЧИСТАЯ ПОДПИСКА НА SSE ---
   useEffect(() => {
-    if (!bridgeParam) {
-      return;
-    }
+    if (!user?.id || !bridgeSession?.id) return;
+    subscribe('participant_joined', bridgeSession.id);
+    const handler = (data: any) => {
+      refreshSession();
+    };
+    on('participant_joined', handler);
+    return () => {
+      unsubscribe('participant_joined', bridgeSession.id);
+      off('participant_joined', handler);
+    };
+  }, [user?.id, bridgeSession?.id]);
 
-    if (bridgeSession && bridgeSession.id === bridgeParam) {
-      return;
-    }
-
-    if (hasLoadedFromLink.current === bridgeParam) {
-      return;
-    }
-
-    // Защита от множественных параллельных вызовов
-    if (isLoadingSession.current) {
-      return;
-    }
+  // --- ЧИСТАЯ ЗАГРУЗКА SESSION ПО LINK ---
+  useEffect(() => {
+    if (!bridgeParam || hasLoadedFromLink.current === bridgeParam) return;
+    if (bridgeSession && bridgeSession.id === bridgeParam) return;
+    if (isLoadingSession.current) return;
 
     isLoadingSession.current = true;
-    loadSession(bridgeParam).then((success) => {
-      isLoadingSession.current = false;
-      if (success) {
-        hasLoadedFromLink.current = bridgeParam;
-      }
-    }).catch(() => {
-      isLoadingSession.current = false;
-    });
+    loadSession(bridgeParam)
+      .then((success) => {
+        isLoadingSession.current = false;
+        if (success) hasLoadedFromLink.current = bridgeParam;
+      })
+      .catch(() => {
+        isLoadingSession.current = false;
+      });
   }, [bridgeParam, bridgeSession, loadSession]);
+
+  // --- ЧИСТАЯ ОБРАБОТКА СБРОСА СОЕДИНЕНИЯ ---
+  useEffect(() => {
+    if (['Terminated', 'Canceled'].includes(sessionState)) setIsConnecting(false);
+    if (sessionState === 'Terminated' && callStatus === 'connecting') dispatch(setCallStatus('idle'));
+  }, [sessionState, callStatus, dispatch]);
 
   // Сбрасываем состояние подключения при завершении звонка
   useEffect(() => {
@@ -226,7 +233,6 @@ const BridgeManager: React.FC = () => {
 
     return () => {
       cancelled = true;
-      unsubscribe('participant_joined', bridgeSession?.id || '');
     };
   }, [bridgeSession?.id, bridgeStatus]);
 

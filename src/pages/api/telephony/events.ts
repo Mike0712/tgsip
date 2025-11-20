@@ -104,7 +104,7 @@ const eventsHandler = async (req: AuthenticatedRequest, res: NextApiResponse) =>
           method: 'POST',
           body: JSON.stringify({
             event: 'participant_joined',
-            sessionId: session.id,
+            event_id: session.id,
             payload: {
               participant
             },
