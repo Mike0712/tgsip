@@ -1,6 +1,6 @@
 // src/pages/admin.tsx
 import React, { useState } from 'react';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/shared/lib/hooks/useAuth';
 
 const Admin = () => {
   const { user, isAuthenticated, logout } = useAuth();

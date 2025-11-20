@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState, AppDispatch } from '@/app/store';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/shared/lib/hooks/useAuth';
+import { useSSE } from '@/shared/lib/hooks/useSSE';
 import { apiClient, SipAccount, UserPhone } from '@/lib/api';
 import { useInviteJoin } from '@/features/InviteJoin/model/useInviteJoin';
 import {
@@ -38,6 +39,7 @@ export const useMiniPhoneController = (): UseMiniPhoneControllerResult => {
   const searchParams = useSearchParams();
 
   const { user, isAuthenticated, isLoading, loginWithTelegram } = useAuth();
+  useSSE(user?.id ? user.id.toString() : "");
 
   const [isClient, setIsClient] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);

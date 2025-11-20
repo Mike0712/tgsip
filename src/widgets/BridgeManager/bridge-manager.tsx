@@ -5,7 +5,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '@/app/store';
 import { useBridgeDialer } from '@/features/BridgeDialer/model/useBridgeDialer';
 import { useAlert } from '@/shared/lib/hooks/useAlert';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/shared/lib/hooks/useAuth';
 import { useSearchParams } from 'next/navigation';
 import { getSipServiceInstance } from '@/entities/WebRtc/services/sipServiceInstance';
 import { BridgeSession } from '@/lib/api';
@@ -13,7 +13,7 @@ import { setCallStatus, setSessionState } from '@/entities/WebRtc/model/slice';
 import store from '@/app/store';
 import { BridgeParticipantsList } from './bridge-participants-list';
 import { BridgeShareBlock } from './bridge-share-block';
-import { useSSE } from '@/hooks/useSSE';
+import { useSSE } from '@/shared/lib/hooks/useSSE';
 
 const formatStatus = (status: ReturnType<typeof useBridgeDialer>['bridgeStatus']) => {
   switch (status) {
@@ -70,16 +70,6 @@ const BridgeManager: React.FC = () => {
     const tg = window.Telegram?.WebApp;
     return tg?.initDataUnsafe?.start_param || null;
   })();
-
-  useSSE({
-    sessionId: bridgeSession?.id || '',
-    userId: user?.id?.toString() || '',
-    handlers: {
-      'participant_joined': (event: MessageEvent) => {
-        refreshSession();
-      },
-    },
-  });
   
   const bridgeParam = bridgeParamFromStartApp || bridgeParamFromStartParam;
   const hasLoadedFromLink = useRef<string | null>(null);

@@ -1,6 +1,6 @@
 import React from 'react';
 import { LogoutIcon } from '@heroicons/react/solid';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/shared/lib/hooks/useAuth';
 import cls from './logout.module.css';
 
 const Logout = () => {
