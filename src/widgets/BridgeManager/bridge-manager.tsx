@@ -51,6 +51,7 @@ const BridgeManager: React.FC = () => {
   } = useBridgeDialer();
   const { showAlert } = useAlert();
   const { user } = useAuth();
+  const { subscribe, unsubscribe, on, off } = useSSE(user?.id ? user.id.toString() : "");
   const searchParams = useSearchParams();
   const [isConnecting, setIsConnecting] = useState(false);
 
@@ -80,6 +81,7 @@ const BridgeManager: React.FC = () => {
 
   const deepLink = useMemo(() => {
     if (!bridgeSession || !botUsername) return null;
+    subscribe('participant_joined', bridgeSession.id);
     return `https://t.me/${botUsername}?startapp=${bridgeSession.id}`;
   }, [bridgeSession, botUsername]);
 
@@ -224,6 +226,7 @@ const BridgeManager: React.FC = () => {
 
     return () => {
       cancelled = true;
+      unsubscribe('participant_joined', bridgeSession?.id || '');
     };
   }, [bridgeSession?.id, bridgeStatus]);
 
