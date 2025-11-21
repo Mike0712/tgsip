@@ -24,14 +24,14 @@ const SipStatus = () => {
     store.dispatch(setSessionState(state))
   }
 
-  // Инициализация SIP сервиса при изменении выбранного аккаунта
   useEffect(() => {
     if (selectedAccount) {
-      // Пересоздаем SipService с новыми данными
       sipService = new SipService(
         selectedAccount.sip_server,
+        selectedAccount.sip_port,
         selectedAccount.sip_username,
-        selectedAccount.secret
+        selectedAccount.secret,
+        selectedAccount.turn_server || null
       );
       sipService.initialize();
       setSipServiceInstance(sipService); // Сохраняем глобально

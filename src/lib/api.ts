@@ -27,6 +27,7 @@ interface SipAccount {
   secret: string;
   is_active: boolean;
   settings?: any;
+  turn_server?: string | null;
 }
 
 interface Server {

@@ -7,13 +7,13 @@ class SipService {
   private registerer: Registerer | null = null;
   private session: Inviter | Invitation | object = {};
 
-  constructor(private host: string | null, private username: string, private password: string) { }
+  constructor(private host: string | null, private port: number | null, private username: string, private password: string, private turnServer: string | null) { }
 
   initialize() {
     const userAgentOptions: UserAgentOptions = {
       uri: UserAgent.makeURI(`sip:${this.username}@${this.host}`),
       transportOptions: {
-        server: `wss://${this.host}:8189/ws`,
+        server: `wss://${this.host}:${this.port}/ws`,
       },
       authorizationUsername: this.username,
       authorizationPassword: this.password,
@@ -31,9 +31,23 @@ class SipService {
         }
       }
     };
-
-    console.log('🔌 Connecting to:', `wss://${this.host}:8189/ws`);
-    console.log('👤 SIP URI:', `sip:${this.username}@${this.host}`);
+    if (this.turnServer) {
+      const [turnIp, turnUsername, turnPassword] = this.turnServer.split(':');
+      userAgentOptions.sessionDescriptionHandlerFactoryOptions = {
+        peerConnectionOptions: {
+          iceServers: [
+            {
+              urls: [
+                `turn:${turnIp}:3478?transport=udp`,
+                "turn:${turnIp}:3478?transport=tcp"
+              ],
+              username: turnUsername,
+              credential: turnPassword
+            }
+          ]
+        }
+      };
+    };
 
     this.userAgent = new UserAgent(userAgentOptions);
     this.registerer = new Registerer(this.userAgent);
@@ -74,12 +88,12 @@ class SipService {
     }
     // Добавляем Caller ID в SIP headers если передан
     if (callerId) {
-      extraHeaders.push(`P-Asserted-Identity: <sip:${callerId}@${this.host}>`);
-      extraHeaders.push(`Remote-Party-ID: <sip:${callerId}@${this.host}>;party=calling;privacy=off`);
+      extraHeaders.push(`P - Asserted - Identity: <sip:${ callerId } @${ this.host }> `);
+      extraHeaders.push(`Remote - Party - ID: <sip:${ callerId } @${ this.host }>; party = calling; privacy = off`);
       console.log('📞 Using Caller ID:', callerId);
     }
     
-    const target = UserAgent.makeURI(`sip:${phone}@${this.host}`);
+    const target = UserAgent.makeURI(`sip:${ phone } @${ this.host } `);
     try {
       // Запрашиваем микрофон ДО звонка (критично для мобильных)
       try {
@@ -114,7 +128,7 @@ class SipService {
   }
 
   async makeCallToSipAccount(sipUsername: string, listener: (state: string) => void) {
-    const target = UserAgent.makeURI(`sip:${sipUsername}@${this.host}`);
+    const target = UserAgent.makeURI(`sip:${ sipUsername } @${ this.host } `);
     
     try {
       // Запрашиваем микрофон ДО звонка (критично для мобильных)
@@ -140,7 +154,7 @@ class SipService {
             this.listenSessionState(state);
             listener(state);
           });
-          console.log(`📞 Calling SIP account: ${sipUsername}`);
+          console.log(`📞 Calling SIP account: ${ sipUsername } `);
           this.session.invite();
         }
       }
