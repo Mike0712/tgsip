@@ -110,6 +110,7 @@ class SipService {
       }
 
       if (this.userAgent instanceof UserAgent && target instanceof URI) {
+        const pc: RTCPeerConnection = (this.session as { peerConnection: RTCPeerConnection }).peerConnection;
         this.session = new Inviter(this.userAgent, target, {
           sessionDescriptionHandlerOptions: {
             constraints: { audio: true, video: false }
@@ -122,6 +123,39 @@ class SipService {
             listener(state);
           });
           this.session.invite();
+          if (this.turnServer) {
+             const pc = (this.session.sessionDescriptionHandler as unknown as { peerConnection: RTCPeerConnection }).peerConnection;
+             let relayFound = false;
+              // 1) Слушаем появление кандидатов
+              pc.onicecandidate = (e) => {
+                if (e.candidate && e.candidate.candidate.includes("typ relay")) {
+                  relayFound = true;
+                  console.log("TURN relay candidate detected");
+                }
+              };
+
+              // 2) Слушаем завершение ICE-gathering
+              pc.onicegatheringstatechange = () => {
+                if (pc.iceGatheringState === "complete") {
+                  console.log("ICE gathering completed");
+
+                  if (!relayFound) {
+                    console.error("TURN relay not found — aborting call");
+                    (this.session as Session).bye();
+                  }
+                }
+              };
+
+              // 3) Дополнительно можно слушать ICE connection events
+              pc.oniceconnectionstatechange = () => {
+                console.log("ICE state:", pc.iceConnectionState);
+
+                if (pc.iceConnectionState === "failed") {
+                  console.error("ICE failed — likely TURN issue");
+                  (this.session as Session).bye();
+                }
+              };
+          }
         }
       }
     } catch ($e) {
