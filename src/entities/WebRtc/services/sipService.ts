@@ -33,18 +33,20 @@ class SipService {
     };
     if (this.turnServer) {
       const [turnIp, turnUsername, turnPassword] = this.turnServer.split(':');
+
       userAgentOptions.sessionDescriptionHandlerFactoryOptions = {
-        peerConnectionOptions: {
+        peerConnectionConfiguration: {
           iceServers: [
             {
               urls: [
                 `turn:${turnIp}:3478?transport=udp`,
-                "turn:${turnIp}:3478?transport=tcp"
+                `turn:${turnIp}:3478?transport=tcp`
               ],
               username: turnUsername,
               credential: turnPassword
             }
-          ]
+          ],
+          iceTransportPolicy: "relay"
         }
       };
     };
@@ -88,12 +90,12 @@ class SipService {
     }
     // Добавляем Caller ID в SIP headers если передан
     if (callerId) {
-      extraHeaders.push(`P - Asserted - Identity: <sip:${ callerId } @${ this.host }> `);
-      extraHeaders.push(`Remote - Party - ID: <sip:${ callerId } @${ this.host }>; party = calling; privacy = off`);
+      extraHeaders.push(`P-Asserted-Identity: <sip:${callerId}@${this.host}>`);
+      extraHeaders.push(`Remote-Party-ID: <sip:${callerId}@${this.host}>;party=calling;privacy=off`);
       console.log('📞 Using Caller ID:', callerId);
     }
-    
-    const target = UserAgent.makeURI(`sip:${ phone } @${ this.host } `);
+
+    const target = UserAgent.makeURI(`sip:${phone}@${this.host}`);
     try {
       // Запрашиваем микрофон ДО звонка (критично для мобильных)
       try {
