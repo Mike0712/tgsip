@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '@/app/store';
 import { 
@@ -21,7 +21,7 @@ const SipAdmin = () => {
   const [newPhone, setNewPhone] = useState({ server_id: '', number: '', active: true });
   const [newUserSip, setNewUserSip] = useState({ server_id: '', selected_phone_id: '', secret: '' });
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       const [serversResponse, phonesResponse, userSipResponse] = await Promise.all([
         apiClient.getServers(),
@@ -37,11 +37,11 @@ const SipAdmin = () => {
     } catch (error) {
       console.error('Failed to load data:', error);
     }
-  };
+  }, [dispatch]);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [loadData]);
 
   const handleCreateServer = async (e: React.FormEvent) => {
     e.preventDefault();

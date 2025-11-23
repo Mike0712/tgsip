@@ -7,13 +7,13 @@ class SipService {
   private registerer: Registerer | null = null;
   private session: Inviter | Invitation | object = {};
 
-  constructor(private host: string | null, private username: string, private password: string) { }
+  constructor(private host: string | null, private port: number | null, private username: string, private password: string, private turnServer: string | null) { }
 
   initialize() {
     const userAgentOptions: UserAgentOptions = {
       uri: UserAgent.makeURI(`sip:${this.username}@${this.host}`),
       transportOptions: {
-        server: `wss://${this.host}:8189/ws`,
+        server: `wss://${this.host}:${this.port}/ws`,
       },
       authorizationUsername: this.username,
       authorizationPassword: this.password,
@@ -31,9 +31,25 @@ class SipService {
         }
       }
     };
+    if (this.turnServer) {
+      const [turnIp, turnUsername, turnPassword] = this.turnServer.split(':');
 
-    console.log('🔌 Connecting to:', `wss://${this.host}:8189/ws`);
-    console.log('👤 SIP URI:', `sip:${this.username}@${this.host}`);
+      userAgentOptions.sessionDescriptionHandlerFactoryOptions = {
+        peerConnectionConfiguration: {
+          iceServers: [
+            {
+              urls: [
+                `turn:${turnIp}:3478?transport=udp`,
+                `turn:${turnIp}:3478?transport=tcp`
+              ],
+              username: turnUsername,
+              credential: turnPassword
+            }
+          ],
+          iceTransportPolicy: "relay"
+        }
+      };
+    };
 
     this.userAgent = new UserAgent(userAgentOptions);
     this.registerer = new Registerer(this.userAgent);
@@ -67,17 +83,89 @@ class SipService {
       });
   }
 
-  async makeCall(phone: string, listener: (state: string) => void, callerId?: string | null) {
-    const extraHeaders: string[] = [];
-    
+  async makeCall(phone: string, listener: (state: string) => void, callerId?: string | null, args?: string[]) {
+    const extraHeaders = args || [];
+    if (process.env.NODE_ENV === 'development') {
+      extraHeaders.push('X-app: test');
+    }
     // Добавляем Caller ID в SIP headers если передан
     if (callerId) {
       extraHeaders.push(`P-Asserted-Identity: <sip:${callerId}@${this.host}>`);
       extraHeaders.push(`Remote-Party-ID: <sip:${callerId}@${this.host}>;party=calling;privacy=off`);
       console.log('📞 Using Caller ID:', callerId);
     }
-    
+
     const target = UserAgent.makeURI(`sip:${phone}@${this.host}`);
+    try {
+      // Запрашиваем микрофон ДО звонка (критично для мобильных)
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        console.log('🎤 Microphone access granted');
+        // Останавливаем стрим, SIP.js создаст свой
+        stream.getTracks().forEach(track => track.stop());
+      } catch (micError) {
+        console.error('❌ Microphone access denied:', micError);
+        alert('Для звонка необходим доступ к микрофону');
+        return;
+      }
+
+      if (this.userAgent instanceof UserAgent && target instanceof URI) {
+        const pc: RTCPeerConnection = (this.session as { peerConnection: RTCPeerConnection }).peerConnection;
+        this.session = new Inviter(this.userAgent, target, {
+          sessionDescriptionHandlerOptions: {
+            constraints: { audio: true, video: false }
+          },
+          extraHeaders
+        });
+        if (this.session instanceof Session) {
+          this.session.stateChange.addListener((state: string) => {
+            this.listenSessionState(state);
+            listener(state);
+          });
+          this.session.invite();
+          if (this.turnServer) {
+             const pc = (this.session.sessionDescriptionHandler as unknown as { peerConnection: RTCPeerConnection }).peerConnection;
+             let relayFound = false;
+              // 1) Слушаем появление кандидатов
+              pc.onicecandidate = (e) => {
+                if (e.candidate && e.candidate.candidate.includes("typ relay")) {
+                  relayFound = true;
+                  console.log("TURN relay candidate detected");
+                }
+              };
+
+              // 2) Слушаем завершение ICE-gathering
+              pc.onicegatheringstatechange = () => {
+                if (pc.iceGatheringState === "complete") {
+                  console.log("ICE gathering completed");
+
+                  if (!relayFound) {
+                    console.error("TURN relay not found — aborting call");
+                    (this.session as Session).bye();
+                  }
+                }
+              };
+
+              // 3) Дополнительно можно слушать ICE connection events
+              pc.oniceconnectionstatechange = () => {
+                console.log("ICE state:", pc.iceConnectionState);
+
+                if (pc.iceConnectionState === "failed") {
+                  console.error("ICE failed — likely TURN issue");
+                  (this.session as Session).bye();
+                }
+              };
+          }
+        }
+      }
+    } catch ($e) {
+      console.log($e, 'err');
+    }
+  }
+
+  async makeCallToSipAccount(sipUsername: string, listener: (state: string) => void) {
+    const target = UserAgent.makeURI(`sip:${ sipUsername } @${ this.host } `);
+    
     try {
       // Запрашиваем микрофон ДО звонка (критично для мобильных)
       try {
@@ -95,19 +183,19 @@ class SipService {
         this.session = new Inviter(this.userAgent, target, {
           sessionDescriptionHandlerOptions: {
             constraints: { audio: true, video: false }
-          },
-          extraHeaders
+          }
         });
         if (this.session instanceof Session) {
           this.session.stateChange.addListener((state: string) => {
             this.listenSessionState(state);
             listener(state);
           });
+          console.log(`📞 Calling SIP account: ${ sipUsername } `);
           this.session.invite();
         }
       }
     } catch ($e) {
-      console.log($e, 'err');
+      console.error('❌ Error making call to SIP account:', $e);
     }
   }
   answer() {

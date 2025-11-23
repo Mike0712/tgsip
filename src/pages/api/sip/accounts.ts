@@ -45,7 +45,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             'sip_accounts.settings',
             'servers.url as sip_server',
             'servers.ip as sip_ip',
-            'servers.port as sip_port'
+            'servers.port as sip_port',
+            'servers.turn_server'
           )
           .join('servers', 'sip_accounts.server_id', 'servers.id')
           .where('sip_accounts.user_id', user.userId);
@@ -62,7 +63,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             sip_port: parseInt(account.sip_port),
             secret: account.sip_password,
             is_active: account.is_active,
-            settings: account.settings
+            settings: account.settings,
+            turn_server: account.turn_server
           }))
         });
         break;

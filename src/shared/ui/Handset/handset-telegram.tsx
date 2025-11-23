@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import cls from "./handset.module.css";
 import { PhoneIcon, XIcon } from "@heroicons/react/solid";
 import { useSelector } from 'react-redux';
@@ -48,7 +48,7 @@ const Handset = (props: HandsetProps) => {
   };
 
   const ringRef = useRef<HTMLAudioElement | null>(null);
-  const playRing = () => {
+  const playRing = useCallback(() => {
     if (ringRef.current) {
       ringRef.current.loop = true;
       ringRef.current.play();
@@ -62,7 +62,7 @@ const Handset = (props: HandsetProps) => {
         console.log('⚠️ showAlert not supported:', error);
       }
     }
-  };
+  }, [isClient]);
 
   const pauseRing = () => {
     ringRef.current && ringRef.current.pause();
@@ -74,13 +74,41 @@ const Handset = (props: HandsetProps) => {
     } else {
       pauseRing();
     }
-  }, [invite])
+  }, [invite, playRing])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setDialingNumber(e.target.value);
   };
 
-  const handleCall = () => {
+  const handleHangup = () => {
+    setDialingNumber("");
+    store.dispatch(setHangup(true));
+
+    // Haptic feedback (если поддерживается)
+    if (isClient && typeof window !== 'undefined' && window.Telegram?.WebApp?.HapticFeedback) {
+      try {
+        window.Telegram.WebApp.HapticFeedback.impactOccurred('heavy');
+      } catch (error) {
+        console.log('⚠️ Haptic feedback not supported:', error);
+      }
+    }
+  };
+
+  const handleAnswer = useCallback(() => {
+    store.dispatch(setInvite(false));
+    store.dispatch(setAnswer(true));
+
+    // Haptic feedback (если поддерживается)
+    if (isClient && typeof window !== 'undefined' && window.Telegram?.WebApp?.HapticFeedback) {
+      try {
+        window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+      } catch (error) {
+        console.log('⚠️ Haptic feedback not supported:', error);
+      }
+    }
+  }, [isClient]);
+
+  const handleCall = useCallback(() => {
     if (dialingNumber.trim()) {
       // Сохраняем выбранный caller ID в Redux
       store.dispatch(setReduxCallerId(selectedCallerId?.phone_number || null));
@@ -103,35 +131,7 @@ const Handset = (props: HandsetProps) => {
         }
       }
     }
-  };
-
-  const handleHangup = () => {
-    setDialingNumber("");
-    store.dispatch(setHangup(true));
-
-    // Haptic feedback (если поддерживается)
-    if (isClient && typeof window !== 'undefined' && window.Telegram?.WebApp?.HapticFeedback) {
-      try {
-        window.Telegram.WebApp.HapticFeedback.impactOccurred('heavy');
-      } catch (error) {
-        console.log('⚠️ Haptic feedback not supported:', error);
-      }
-    }
-  };
-
-  const handleAnswer = () => {
-    store.dispatch(setInvite(false));
-    store.dispatch(setAnswer(true));
-
-    // Haptic feedback (если поддерживается)
-    if (isClient && typeof window !== 'undefined' && window.Telegram?.WebApp?.HapticFeedback) {
-      try {
-        window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
-      } catch (error) {
-        console.log('⚠️ Haptic feedback not supported:', error);
-      }
-    }
-  }
+  }, [dialingNumber, selectedCallerId, onCall, isClient]);
 
   // Синхронизация с Telegram MainButton
   useEffect(() => {
@@ -158,7 +158,7 @@ const Handset = (props: HandsetProps) => {
         console.log('⚠️ MainButton not supported:', error);
       }
     }
-  }, [isClient, dialingNumber, sessionState, invite]);
+  }, [isClient, dialingNumber, sessionState, invite, handleAnswer, handleCall]);
 
   return (
     <div className={cls.handset}>

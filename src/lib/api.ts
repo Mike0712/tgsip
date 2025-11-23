@@ -27,6 +27,7 @@ interface SipAccount {
   secret: string;
   is_active: boolean;
   settings?: any;
+  turn_server?: string | null;
 }
 
 interface Server {
@@ -77,6 +78,108 @@ interface UserPhone {
   server_port?: string;
 }
 
+interface InviteLink {
+  id: number;
+  token: string;
+  creator_id: number;
+  creator_telegram_id: string;
+  creator_sip_username?: string;
+  status: 'active' | 'expired' | 'completed';
+  created_at: string;
+  expires_at?: string;
+}
+
+interface InviteInfo {
+  invite: InviteLink;
+  creator: {
+    telegram_id: string;
+    username?: string;
+    first_name: string;
+    sip_username?: string;
+  };
+}
+
+interface JoinInviteResponse {
+  invite: InviteLink;
+  sip_account?: SipAccount;
+  partner_sip_username?: string;
+  ready_to_call: boolean;
+}
+
+interface UserSummary {
+  id: number;
+  telegram_id: string;
+  username?: string;
+  first_name: string;
+  last_name?: string;
+  photo_url?: string;
+}
+
+interface BridgeParticipant {
+  id: string;
+  bridge_id: string;
+  type: 'user' | 'sip' | 'phone' | 'external';
+  role: 'initiator' | 'participant';
+  reference: string;
+  display_name?: string;
+  status: 'pending' | 'dialing' | 'joined' | 'failed' | 'left';
+  user_id?: number | null;
+  created_at: string;
+  updated_at: string;
+  metadata?: Record<string, unknown>;
+}
+
+interface BridgeSession {
+  id: string;
+  creator_id?: number;
+  creator_user_id?: number | null;
+  status: 'pending' | 'active' | 'completed' | 'failed' | 'terminated';
+  target?: string;
+  metadata?: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+  join_extension?: string;
+}
+
+interface BridgeCreateResponse {
+  success?: boolean;
+  bridge: BridgeSession;
+  participants?: BridgeParticipant[];
+}
+
+interface BridgeParticipantsResponse {
+  success?: boolean;
+  participants?: BridgeParticipant[];
+  result?: unknown;
+}
+
+interface CallSessionRecord {
+  id: number;
+  bridge_id: string;
+  link_hash: string;
+  status: 'pending' | 'active' | 'completed' | 'failed' | 'terminated';
+  server_id: number;
+  creator_user_id?: number | null;
+  join_extension: string;
+  metadata?: any;
+  created_at: string;
+  updated_at: string;
+}
+
+interface CallSessionParticipantRecord {
+  id: number;
+  session_id: number;
+  user_id?: number | null;
+  endpoint: string;
+  role: 'initiator' | 'participant';
+  status: 'pending' | 'dialing' | 'joined' | 'failed' | 'left';
+  joined_at?: string | null;
+  left_at?: string | null;
+  metadata?: any;
+  created_at: string;
+  updated_at: string;
+}
+
 class ApiClient {
   private baseUrl: string;
   private token: string | null = null;
@@ -120,13 +223,59 @@ class ApiClient {
         ...options,
         headers,
       });
+      const contentType = response.headers.get('content-type') || '';
+      let data: any = null;
 
-      const data = await response.json();
+      if (contentType.includes('application/json')) {
+        try {
+          data = await response.json();
+        } catch (parseError) {
+          const errorMessage = parseError instanceof Error ? parseError.message : 'Invalid JSON response';
+          console.error('Failed to parse JSON response:', parseError);
+          return {
+            success: false,
+            error: errorMessage,
+          };
+        }
+      } else {
+        const text = await response.text();
+        const trimmed = text.trim();
+
+        if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+          try {
+            data = JSON.parse(trimmed);
+          } catch (parseError) {
+            console.error('Failed to parse JSON-like text response:', parseError);
+            return {
+              success: false,
+              error: 'Invalid JSON response',
+            };
+          }
+        } else {
+          if (!response.ok) {
+            return {
+              success: false,
+              error: trimmed || response.statusText || 'Request failed',
+            };
+          }
+
+          console.warn('Unexpected non-JSON response from API:', {
+            endpoint,
+            status: response.status,
+            preview: trimmed.substring(0, 200),
+          });
+
+          return {
+            success: false,
+            error: 'Unexpected response format',
+          };
+        }
+      }
 
       if (!response.ok) {
         return {
           success: false,
-          error: data.error || 'Request failed',
+          error: data?.error || data?.message || response.statusText || 'Request failed',
         };
       }
 
@@ -264,10 +413,117 @@ class ApiClient {
   async getUserPhones(): Promise<ApiResponse<{ phones: UserPhone[]; count: number }>> {
     return this.request<{ phones: UserPhone[]; count: number }>('/user-phones');
   }
+
+  // Add user to Asterisk (external API)
+  // telegramId берется из токена аутентификации
+  async addUser(): Promise<ApiResponse<SipAccount>> {
+    return this.request<SipAccount>('/users/add', {
+      method: 'POST',
+    });
+  }
+
+  // Invite links endpoints
+  async createInviteLink(): Promise<ApiResponse<InviteLink>> {
+    return this.request<InviteLink>('/invite/create', {
+      method: 'POST',
+    });
+  }
+
+  async getInviteInfo(token: string): Promise<ApiResponse<InviteInfo>> {
+    return this.request<InviteInfo>(`/invite/${token}`);
+  }
+
+  async joinInvite(token: string): Promise<ApiResponse<JoinInviteResponse>> {
+    return this.request<JoinInviteResponse>(`/invite/${token}/join`, {
+      method: 'POST',
+    });
+  }
+
+  async cancelInvite(token: string): Promise<ApiResponse<void>> {
+    return this.request<void>(`/invite/${token}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async searchUsers(query: string, limit = 10): Promise<ApiResponse<{ users: UserSummary[] }>> {
+    const params = new URLSearchParams({ q: query });
+
+    if (limit) {
+      params.set('limit', String(limit));
+    }
+
+    return this.request<{ users: UserSummary[] }>(`/users/search?${params.toString()}`);
+  }
+
+  async getUsersByIds(userIds: number[]): Promise<ApiResponse<{ users: UserSummary[] }>> {
+    return this.request<{ users: UserSummary[] }>('/users/batch', {
+      method: 'POST',
+      body: JSON.stringify({ userIds }),
+    });
+  }
+
+  async sendInviteMessage(payload: { telegram_id: string; link: string; message?: string }): Promise<ApiResponse<{ success: boolean }>> {
+    return this.request<{ success: boolean }>('/invite/send', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async createBridgeSession(payload: { target?: string; metadata?: Record<string, unknown> }): Promise<ApiResponse<BridgeCreateResponse>> {
+    return this.request<BridgeCreateResponse>('/calls/bridges', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async addBridgeParticipant(
+    bridgeId: string,
+    payload: {
+      channel: string;
+      role?: string;
+      userId: number;
+    },
+  ): Promise<ApiResponse<BridgeParticipantsResponse>> {
+    return this.request<BridgeParticipantsResponse>(`/calls/bridges/${bridgeId}/participants`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async getBridgeSession(bridgeId: string): Promise<ApiResponse<BridgeCreateResponse>> {
+    return this.request<BridgeCreateResponse>(`/calls/bridges/${bridgeId}`);
+  }
+
+  async getStoredCallSession(bridgeId: string): Promise<ApiResponse<{ session: CallSessionRecord; participants: CallSessionParticipantRecord[] }>> {
+    return this.request<{ session: CallSessionRecord; participants: CallSessionParticipantRecord[] }>(`/calls/sessions/${bridgeId}`);
+  }
+
+  async endBridgeSession(bridgeId: string): Promise<ApiResponse<{ success?: boolean }>> {
+    return this.request<{ success?: boolean }>(`/calls/bridges/${bridgeId}`, {
+      method: 'DELETE',
+    });
+  }
 }
 
 export const apiClient = new ApiClient();
 export default ApiClient;
 
 // Export types
-export type { Server, Phone, UserSipConfig, SipAccount, AuthResponse, ApiResponse, UserPhone };
+export type {
+  Server,
+  Phone,
+  UserSipConfig,
+  SipAccount,
+  AuthResponse,
+  ApiResponse,
+  UserPhone,
+  InviteLink,
+  InviteInfo,
+  JoinInviteResponse,
+  UserSummary,
+  BridgeParticipant,
+  BridgeSession,
+  BridgeCreateResponse,
+  CallSessionRecord,
+  CallSessionParticipantRecord,
+};

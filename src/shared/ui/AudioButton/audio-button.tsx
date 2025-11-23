@@ -1,42 +1,79 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 
 const AudioButton = () => {
-  const [audioBlocked, setAudioBlocked] = useState(false);
-  const [hidden, setHidden] = useState(true);
+  const [blocked, setBlocked] = useState(false);
+  const [muted, setMuted] = useState(true);
 
   useEffect(() => {
-    // Слушаем событие ошибки воспроизведения
-    const handlePlayError = () => {
-      setAudioBlocked(true);
-      setHidden(false);
-    };
-
+    const handlePlayError = () => setBlocked(true);
     window.addEventListener('audio-play-failed', handlePlayError);
     return () => window.removeEventListener('audio-play-failed', handlePlayError);
   }, []);
 
-  const handleUnblock = () => {
-    const mediaElement = document.getElementById('mediaElement') as HTMLAudioElement;
-    if (mediaElement) {
-      mediaElement.play()
+  useEffect(() => {
+    const mediaElement = document.getElementById('mediaElement') as HTMLMediaElement | null;
+    if (!mediaElement) return;
+
+    mediaElement.muted = muted;
+    mediaElement.volume = muted ? 0 : 1;
+  }, [muted]);
+
+  const handleClick = () => {
+    const mediaElement = document.getElementById('mediaElement') as HTMLMediaElement | null;
+    if (!mediaElement) {
+      return;
+    }
+
+    if (blocked) {
+      mediaElement
+        .play()
         .then(() => {
-          console.log('✅ Audio unblocked by user interaction');
-          setAudioBlocked(false);
-          setHidden(true);
+          setBlocked(false);
+          setMuted(false);
         })
-        .catch(err => console.error('Still blocked:', err));
+        .catch((err) => {
+          console.error('Unable to unlock audio:', err);
+          setBlocked(true);
+        });
+      return;
+    }
+
+    if (muted) {
+      mediaElement
+        .play()
+        .then(() => {
+          setMuted(false);
+        })
+        .catch((err) => {
+          console.error('Unable to play audio:', err);
+          setBlocked(true);
+        });
+    } else {
+      setMuted(true);
     }
   };
 
-  if (hidden || !audioBlocked) return null;
+  const isMuted = blocked || muted;
 
   return (
-    <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50">
+    <div className="mt-6 flex justify-center">
       <button
-        onClick={handleUnblock}
-        className="px-6 py-3 bg-green-600 text-white rounded-full shadow-lg hover:bg-green-700 animate-pulse"
+        type="button"
+        onClick={handleClick}
+        className={`relative inline-flex items-center justify-center w-14 h-14 rounded-full shadow transition-colors ${
+          isMuted ? 'bg-red-600 text-white' : 'bg-green-500 text-white'
+        }`}
+        title={isMuted ? 'Звук выключен. Нажми, чтобы включить.' : 'Звук включён. Нажми, чтобы выключить.'}
+        aria-label={isMuted ? 'Включить звук' : 'Выключить звук'}
       >
-        🔊 Включить звук
+        <span className="text-2xl" role="img" aria-hidden="true">
+          🎙️
+        </span>
+        {isMuted && (
+          <span className="absolute inset-0 flex items-center justify-center">
+            <span className="block w-12 h-0.5 bg-gray-300 rotate-45"></span>
+          </span>
+        )}
       </button>
     </div>
   );

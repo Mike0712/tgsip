@@ -1,5 +1,14 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { SipAccount, UserPhone, Server, Phone, UserSipConfig } from '@/lib/api';
+import {
+  SipAccount,
+  UserPhone,
+  Server,
+  Phone,
+  UserSipConfig,
+  InviteLink,
+  BridgeSession,
+  BridgeParticipant,
+} from '@/lib/api';
 
 interface SipState {
   status: 'online' | 'offline';
@@ -19,6 +28,17 @@ interface SipState {
   userSipConfigs: UserSipConfig[];
   selectedServer: Server | null;
   currentCredentials: { username: string; password: string } | null;
+  // Invite link states
+  callMode: 'manual' | 'invite';
+  inviteToken: string | null;
+  activeInvite: InviteLink | null;
+  inviteLink: string | null;
+  inviteStatus: 'idle' | 'creating' | 'active' | 'waiting' | 'connecting' | 'ready';
+  callPartner: { sip_username: string; telegram_id: string } | null;
+  callStatus: 'idle' | 'waiting' | 'connecting' | 'active';
+  bridgeSession: BridgeSession | null;
+  bridgeStatus: 'idle' | 'creating' | 'active' | 'terminating' | 'completed' | 'failed';
+  bridgeParticipants: BridgeParticipant[];
 }
 
 const initialState: SipState = {
@@ -38,7 +58,17 @@ const initialState: SipState = {
   phones: [],
   userSipConfigs: [],
   selectedServer: null,
-  currentCredentials: null
+  currentCredentials: null,
+  callMode: 'manual',
+  inviteToken: null,
+  activeInvite: null,
+  inviteLink: null,
+  inviteStatus: 'idle',
+  callPartner: null,
+  callStatus: 'idle',
+  bridgeSession: null,
+  bridgeStatus: 'idle',
+  bridgeParticipants: [],
 };
 
 const sipSlice = createSlice({
@@ -102,6 +132,51 @@ const sipSlice = createSlice({
     },
     setCurrentCredentials: (state, action: PayloadAction<{ username: string; password: string } | null>) => {
       state.currentCredentials = action.payload;
+    },
+    // Invite link actions
+    setCallMode: (state, action: PayloadAction<'manual' | 'invite'>) => {
+      state.callMode = action.payload;
+    },
+    setInviteToken: (state, action: PayloadAction<string | null>) => {
+      state.inviteToken = action.payload;
+    },
+    setActiveInvite: (state, action: PayloadAction<InviteLink | null>) => {
+      state.activeInvite = action.payload;
+    },
+    setInviteLink: (state, action: PayloadAction<string | null>) => {
+      state.inviteLink = action.payload;
+    },
+    setInviteStatus: (state, action: PayloadAction<'idle' | 'creating' | 'active' | 'waiting' | 'connecting' | 'ready'>) => {
+      state.inviteStatus = action.payload;
+    },
+    setCallPartner: (state, action: PayloadAction<{ sip_username: string; telegram_id: string } | null>) => {
+      state.callPartner = action.payload;
+    },
+    setCallStatus: (state, action: PayloadAction<'idle' | 'waiting' | 'connecting' | 'active'>) => {
+      state.callStatus = action.payload;
+    },
+    setBridgeStatus: (state, action: PayloadAction<SipState['bridgeStatus']>) => {
+      state.bridgeStatus = action.payload;
+    },
+    setBridgeSession: (state, action: PayloadAction<BridgeSession | null>) => {
+      state.bridgeSession = action.payload;
+    },
+    setBridgeParticipants: (state, action: PayloadAction<BridgeParticipant[]>) => {
+      state.bridgeParticipants = action.payload;
+    },
+    resetBridge: (state) => {
+      state.bridgeSession = null;
+      state.bridgeStatus = 'idle';
+      state.bridgeParticipants = [];
+    },
+    resetInvite: (state) => {
+      state.callMode = 'manual';
+      state.inviteToken = null;
+      state.activeInvite = null;
+      state.inviteLink = null;
+      state.inviteStatus = 'idle';
+      state.callPartner = null;
+      state.callStatus = 'idle';
     }
   },
 });
@@ -122,7 +197,19 @@ export const {
   setPhones,
   setUserSipConfigs,
   setSelectedServer,
-  setCurrentCredentials
+  setCurrentCredentials,
+  setCallMode,
+  setInviteToken,
+  setActiveInvite,
+  setInviteLink,
+  setInviteStatus,
+  setCallPartner,
+  setCallStatus,
+  setBridgeStatus,
+  setBridgeSession,
+  setBridgeParticipants,
+  resetBridge,
+  resetInvite
 } = sipSlice.actions;
 
 export default sipSlice.reducer;
