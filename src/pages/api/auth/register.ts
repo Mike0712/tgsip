@@ -58,12 +58,12 @@ async function addUserToAsterisk(telegramId: string, serverIp: string, webPort: 
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    logger.error('Asterisk API error response', JSON.stringify({
+    logger.error({
       url: apiUrl,
       status: response.status,
       error: typeof errorData.error === 'string' ? errorData.error : JSON.stringify(errorData.error),
       telegramId
-    }));
+    },'Asterisk API error response');
     throw new Error((typeof errorData.error === 'string' ? errorData.error : JSON.stringify(errorData.error)) || `Failed to add user to Asterisk (${response.status})`);
   }
 
@@ -169,10 +169,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     try {
       registrationRequest = await checkRegistrationRequestOrThrow(telegramId);
     } catch (e: unknown) {
-      logger.error('Ошибка в регистрации (request check)', JSON.stringify({
+      logger.error({
         message: e instanceof Error ? e.message : String(e),
         stack: e instanceof Error && e.stack ? e.stack : undefined
-      }));
+      },'Ошибка в регистрации (request check)');
       return res.status(
         typeof e === 'object' && e && 'status' in e ? (e as any).status : 403
       ).json({
@@ -185,10 +185,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     try {
       user = await findOrCreateUser(db, telegramUser, first_name);
     } catch (e: unknown) {
-      logger.error('Ошибка создания пользователя', JSON.stringify({
+      logger.error({
         message: e instanceof Error ? e.message : String(e),
         stack: e instanceof Error && e.stack ? e.stack : undefined
-      }));
+      },'Ошибка создания пользователя');
       return res.status(500).json({ error: 'User creation failed', detail: e instanceof Error ? e.message : String(e) });
     }
 
@@ -196,10 +196,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     try {
       selectedServer = await selectServerOrThrow(db);
     } catch (e: unknown) {
-      logger.error('Ошибка выбора сервера', JSON.stringify({
+      logger.error({
         message: e instanceof Error ? e.message : String(e),
         stack: e instanceof Error && e.stack ? e.stack : undefined
-      }));
+      },'Ошибка выбора сервера');
       return res.status(
         typeof e === 'object' && e && 'status' in e ? (e as any).status : 503
       ).json({
@@ -212,20 +212,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     try {
       asteriskResponse = await addUserToAsterisk(telegramId, selectedServer.ip, selectedServer.web_port);
     } catch (e: unknown) {
-      logger.error('Ошибка вызова addUserToAsterisk', JSON.stringify({
+      logger.error({
         message: e instanceof Error ? e.message : String(e),
         stack: e instanceof Error && e.stack ? e.stack : undefined
-      }));
+      },'Ошибка вызова addUserToAsterisk');
       return res.status(502).json({ error: e instanceof Error ? e.message : String(e) || 'Failed to add user to Asterisk', step: 'asterisk_call' });
     }
 
     try {
       await createOrUpdateSipAccount(db, user, selectedServer, asteriskResponse);
     } catch (e: unknown) {
-      logger.error('Ошибка создания SIP-аккаунта', JSON.stringify({
+      logger.error({
         message: e instanceof Error ? e.message : String(e),
         stack: e instanceof Error && e.stack ? e.stack : undefined
-      }));
+      },'Ошибка создания SIP-аккаунта');
       if (typeof e === 'object' && e && 'code' in e && (e as any).code === '23505') {
         return res.status(409).json({ error: 'SIP account already exists', step: 'sip_account_creation' });
       }
@@ -236,10 +236,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     try {
       token = await createAndSaveTokenSession(user, telegramUser, req);
     } catch (e: unknown) {
-      logger.error('Ошибка создания сессии', JSON.stringify({
+      logger.error({
         message: e instanceof Error ? e.message : String(e),
         stack: e instanceof Error && e.stack ? e.stack : undefined
-      }));
+      },'Ошибка создания сессии');
       return res.status(500).json({ error: 'Failed to create session', detail: e instanceof Error ? e.message : String(e) });
     }
 
@@ -256,10 +256,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       },
     });
   } catch (error: unknown) {
-    logger.error('Internal registration error', JSON.stringify({
+    logger.error({
       message: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error && error.stack ? error.stack : undefined
-    }));
+    },'Internal registration error');
     res.status(500).json({
       error: 'Internal server error',
       message: error instanceof Error ? error.message : String(error),
