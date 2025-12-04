@@ -22,7 +22,19 @@ class Logger {
     this.isProd = process.env.NODE_ENV === 'production';
     if (this.isProd) {
       const dest = pino.destination({ dest: getLogFilePath(), sync: false });
-      this.pinoLogger = pino({ level: 'info' }, dest);
+      this.pinoLogger = pino({
+        level: 'info',
+        timestamp: () => {
+          const date = new Date();
+          const yyyy = date.getFullYear();
+          const mm = String(date.getMonth() + 1).padStart(2, '0');
+          const dd = String(date.getDate()).padStart(2, '0');
+          const hh = String(date.getHours()).padStart(2, '0');
+          const ii = String(date.getMinutes()).padStart(2, '0');
+          const ss = String(date.getSeconds()).padStart(2, '0');
+          return `,"time":"${yyyy}-${mm}-${dd} ${hh}:${ii}:${ss}"`;
+        }
+      }, dest);
     } else {
       this.pinoLogger = null;
     }
