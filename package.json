@@ -28,6 +28,7 @@
     "lucide-react": "^0.408.0",
     "next": "14.2.5",
     "pg": "^8.16.3",
+    "pino": "^10.1.0",
     "prettier": "prettier -w .",
     "react": "^18",
     "react-dom": "^18",
