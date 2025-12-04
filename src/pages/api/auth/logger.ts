@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 
 function getLogFilePath() {
-  const logDir = '/var/log/api';
+  const logDir = path.join(process.cwd(), 'logs');
   if (!fs.existsSync(logDir)) {
     fs.mkdirSync(logDir, { recursive: true });
   }
@@ -11,7 +11,7 @@ function getLogFilePath() {
   const yyyy = today.getFullYear();
   const mm = String(today.getMonth() + 1).padStart(2, '0');
   const dd = String(today.getDate()).padStart(2, '0');
-  return `${logDir}/pino-${yyyy}-${mm}-${dd}.log`;
+  return path.join(logDir, `api-${yyyy}-${mm}-${dd}.log`);
 }
 
 class Logger {
