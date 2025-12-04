@@ -44,7 +44,7 @@ function getTelegramUser(req: NextApiRequest): TelegramUser | null {
 
 // Добавляем пользователя в Asterisk и получаем учетные данные
 async function addUserToAsterisk(telegramId: string, serverIp: string, webPort: number): Promise<AsteriskResponse> {
-  const apiUrl = `http://${serverIp}:${webPort}/api/add`;
+  const apiUrl = `http://${serverIp}:${webPort}/api/endpoints/add`;
 
   logger.info(`📞 Adding user ${telegramId} to Asterisk via ${serverIp}:${webPort}`);
 
@@ -57,14 +57,25 @@ async function addUserToAsterisk(telegramId: string, serverIp: string, webPort: 
   });
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    logger.error({
-      url: apiUrl,
-      status: response.status,
-      error: typeof errorData.error === 'string' ? errorData.error : JSON.stringify(errorData.error),
-      telegramId
-    },'Asterisk API error response');
-    throw new Error((typeof errorData.error === 'string' ? errorData.error : JSON.stringify(errorData.error)) || `Failed to add user to Asterisk (${response.status})`);
+    if (response.status === 409) {
+      const resp = await fetch(`http://${serverIp}:${webPort}/api/endpoints/${telegramId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      const data = await resp.json() as AsteriskResponse;
+      return data;
+    } else {
+      const errorData = await response.json().catch(() => ({}));
+      logger.error({
+        url: apiUrl,
+        status: response.status,
+        error: typeof errorData.error === 'string' ? errorData.error : JSON.stringify(errorData.error),
+        telegramId
+      },'Asterisk API error response');
+      throw new Error((typeof errorData.error === 'string' ? errorData.error : JSON.stringify(errorData.error)) || `Failed to add user to Asterisk (${response.status})`);
+    }
   }
 
   const data = await response.json() as AsteriskResponse;
