@@ -112,6 +112,7 @@ const eventsHandler = async (req: AuthenticatedRequest, res: NextApiResponse) =>
               },
             }),
           });
+          logger.info({participant}, '[telephony/events] Participant upserted');
         } catch (error) {
           logger.error({error}, '[telephony/events] Error pushing event');
         }
