@@ -88,7 +88,7 @@ const eventsHandler = async (req: AuthenticatedRequest, res: NextApiResponse) =>
     if (!session) {
       return res.status(404).json({ success: false, error: 'Session not found' });
     }
-    logger.info('[telephony/events] Event received: ', event, payload);
+    logger.info({event, payload}, '[telephony/events] Event received');
     switch (event) {
       case 'bridge_join':
       case 'participant_joined': {
