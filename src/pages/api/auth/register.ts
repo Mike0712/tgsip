@@ -2,7 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { userService, sessionService, registrationRequestService } from '../../../lib/database';
 import { createToken } from '../../../lib/auth';
 import { getDb } from '@/lib/db';
-import logger from './logger';
+import logger from '../logger';
 
 interface TelegramUser {
   id: number;

@@ -10,6 +10,7 @@ import { getDb } from '@/lib/db';
 import type { Knex } from 'knex';
 import { sipAccountService } from '@/lib/database';
 import { sseClient } from '../../api/sseClient';
+import logger from '../logger';
 
 interface TelephonyEventPayload {
   event?: string;
@@ -87,7 +88,7 @@ const eventsHandler = async (req: AuthenticatedRequest, res: NextApiResponse) =>
     if (!session) {
       return res.status(404).json({ success: false, error: 'Session not found' });
     }
-
+    logger.info('[telephony/events] Event received: ', event, payload);
     switch (event) {
       case 'bridge_join':
       case 'participant_joined': {
