@@ -92,25 +92,29 @@ const eventsHandler = async (req: AuthenticatedRequest, res: NextApiResponse) =>
     switch (event) {
       case 'bridge_join':
       case 'participant_joined': {
-        const userAccount = await sipAccountService.findBySipUsername(payload.caller);
-        const participant = await upsertCallSessionParticipant({
-          sessionId: session.id,
-          userId: userAccount?.user_id,
-          endpoint: payload.endpoint || payload.caller || payload.uniqueid || 'unknown',
-          status: payload.status || 'joined',
-          metadata: payload.metadata,
-        });
-        await updateCallSessionStatus(session.id, 'active');
-        await sseClient(`/pushEvent`, {
-          method: 'POST',
-          body: JSON.stringify({
-            event: 'participant_joined',
-            event_id: session.id,
-            payload: {
-              participant
-            },
-          }),
-        });
+        try {
+          const userAccount = await sipAccountService.findBySipUsername(payload.caller);
+          const participant = await upsertCallSessionParticipant({
+            sessionId: session.id,
+            userId: userAccount?.user_id,
+            endpoint: payload.endpoint || payload.caller || payload.uniqueid || 'unknown',
+            status: payload.status || 'joined',
+            metadata: payload.metadata,
+          });
+          await updateCallSessionStatus(session.id, 'active');
+          await sseClient(`/pushEvent`, {
+            method: 'POST',
+            body: JSON.stringify({
+              event: 'participant_joined',
+              event_id: session.id,
+              payload: {
+                participant
+              },
+            }),
+          });
+        } catch (error) {
+          logger.error({error}, '[telephony/events] Error pushing event');
+        }
         break;
       }
 
