@@ -88,12 +88,13 @@ const eventsHandler = async (req: AuthenticatedRequest, res: NextApiResponse) =>
     if (!session) {
       return res.status(404).json({ success: false, error: 'Session not found' });
     }
-    logger.info({event, payload}, '[telephony/events] Event received');
     switch (event) {
       case 'bridge_join':
       case 'participant_joined': {
+        logger.info({event, payload}, '[telephony/events] Entering bridge_join/participant_joined case');
         try {
           const userAccount = await sipAccountService.findBySipUsername(payload.caller);
+          logger.info({userAccount}, '[telephony/events] User account found');
           const participant = await upsertCallSessionParticipant({
             sessionId: session.id,
             userId: userAccount?.user_id,
