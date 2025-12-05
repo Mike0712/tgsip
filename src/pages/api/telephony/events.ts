@@ -94,7 +94,6 @@ const eventsHandler = async (req: AuthenticatedRequest, res: NextApiResponse) =>
         logger.info({event, payload}, '[telephony/events] Entering bridge_join/participant_joined case');
         try {
           const userAccount = await sipAccountService.findBySipUsername(payload.caller);
-          logger.info({userAccount}, '[telephony/events] User account found');
           const participant = await upsertCallSessionParticipant({
             sessionId: session.id,
             userId: userAccount?.user_id,
@@ -107,13 +106,12 @@ const eventsHandler = async (req: AuthenticatedRequest, res: NextApiResponse) =>
             method: 'POST',
             body: JSON.stringify({
               event: 'participant_joined',
-              event_id: session.id,
+              event_id: session.bridge_id,
               payload: {
                 participant
               },
             }),
           });
-          logger.info({participant}, '[telephony/events] Participant upserted');
         } catch (error) {
           logger.error({error}, '[telephony/events] Error pushing event');
         }
