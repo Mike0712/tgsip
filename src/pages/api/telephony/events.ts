@@ -139,6 +139,67 @@ const eventsHandler = async (req: AuthenticatedRequest, res: NextApiResponse) =>
         break;
       }
 
+      case 'bridge_created': {
+        // Мост создан - можно обновить статус сессии на 'active' если она еще не активна
+        if (session.status !== 'active') {
+          await updateCallSessionStatus(session.id, 'active');
+        }
+        break;
+      }
+
+      case 'channel_destroyed':
+      case 'channel_hangup_request':
+      case 'stasis_end': {
+        // Канал уничтожен/завершен/покинул Stasis - обновляем статус участника
+        const endpoint = payload.endpoint || payload.caller || payload.uniqueid;
+        if (endpoint) {
+          const userAccount = await sipAccountService.findBySipUsername(payload.caller || endpoint);
+          await upsertCallSessionParticipant({
+            sessionId: session.id,
+            userId: userAccount?.user_id,
+            endpoint: endpoint,
+            status: 'left',
+            metadata: {
+              ...payload.metadata,
+              cause: payload.metadata?.cause,
+              cause_txt: payload.metadata?.cause_txt,
+            },
+          });
+        }
+        break;
+      }
+
+      case 'channel_state_change': {
+        // Изменение состояния канала - обновляем статус участника если канал стал активным
+        const endpoint = payload.endpoint || payload.caller || payload.uniqueid;
+        const channelState = payload.metadata?.channel_state as string;
+        
+        if (endpoint && channelState === 'Up') {
+          const userAccount = await sipAccountService.findBySipUsername(payload.caller || endpoint);
+          const participant = await upsertCallSessionParticipant({
+            sessionId: session.id,
+            userId: userAccount?.user_id,
+            endpoint: endpoint,
+            status: 'joined',
+            metadata: payload.metadata,
+          });
+          
+          await updateCallSessionStatus(session.id, 'active');
+          
+          await sseClient(`/pushEvent`, {
+            method: 'POST',
+            body: JSON.stringify({
+              event: 'participant_joined',
+              event_id: session.id,
+              payload: {
+                participant
+              },
+            }),
+          });
+        }
+        break;
+      }
+
       default:
         console.log('[telephony/events] Unhandled event', event, payload);
         break;
