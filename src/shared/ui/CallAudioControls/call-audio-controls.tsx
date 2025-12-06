@@ -22,13 +22,14 @@ export const CallAudioControls: React.FC<CallAudioControlsProps> = ({ audioRef }
       // Управление громкостью (1 — громкая, 0.2 — "наушник")
       const targetVolume = speakerOn ? 1 : 0.2;
       
+      // Устанавливаем muted сразу (синхронно) - это критично для работы
+      audioRef.current.muted = !audioEnabled;
+      
       // Устанавливаем громкость с небольшой задержкой, чтобы убедиться что элемент готов
       const timer = setTimeout(() => {
         if (audioRef.current) {
           audioRef.current.volume = targetVolume;
-          audioRef.current.muted = !audioEnabled;
-          
-          console.log(`[CallAudioControls] Volume set: ${audioRef.current.volume}, speakerOn: ${speakerOn}, muted: ${!audioEnabled}`);
+          console.log(`[CallAudioControls] Volume set: ${audioRef.current.volume}, speakerOn: ${speakerOn}, muted: ${audioRef.current.muted}`);
         }
       }, 0);
       
@@ -45,17 +46,16 @@ export const CallAudioControls: React.FC<CallAudioControlsProps> = ({ audioRef }
 
   const handleMicrophoneToggle = () => {
     const newAudioEnabled = !audioEnabled;
+    console.log(`[CallAudioControls] Toggling microphone: ${audioEnabled} -> ${newAudioEnabled}`);
     setAudioEnabled(newAudioEnabled);
     
-    if (audioRef.current) {
-      audioRef.current.muted = !newAudioEnabled;
-      
-      if (newAudioEnabled) {
-        // При включении звука пытаемся его воспроизвести
-        audioRef.current.play().catch(err => {
-          console.warn('Failed to play audio on microphone toggle:', err);
-        });
-      }
+    // Не устанавливаем muted здесь - пусть useEffect это делает синхронно
+    // Но пытаемся включить звук при включении
+    if (newAudioEnabled && audioRef.current) {
+      // При включении звука пытаемся его воспроизвести
+      audioRef.current.play().catch(err => {
+        console.warn('Failed to play audio on microphone toggle:', err);
+      });
     }
   };
 
