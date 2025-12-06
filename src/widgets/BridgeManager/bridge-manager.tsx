@@ -14,11 +14,7 @@ import store from '@/app/store';
 import { BridgeParticipantsList } from './bridge-participants-list';
 import { BridgeShareBlock } from './bridge-share-block';
 import { useSSE } from '@/shared/lib/hooks/useSSE';
-
-function isMobileDevice() {
-  if (typeof navigator === 'undefined') return false;
-  return /android|iphone|ipad|ipod|mobile|ios|blackberry|iemobile|opera mini/i.test(navigator.userAgent);
-}
+import { CallAudioControls } from '@/shared/ui/CallAudioControls/call-audio-controls';
 
 const formatStatus = (status: ReturnType<typeof useBridgeDialer>['bridgeStatus']) => {
   switch (status) {
@@ -59,9 +55,7 @@ const BridgeManager: React.FC = () => {
   const { subscribe, unsubscribe, on, off } = useSSE(user?.id ? user.id.toString() : "");
   const searchParams = useSearchParams();
   const [isConnecting, setIsConnecting] = useState(false);
-  const [speakerOn, setSpeakerOn] = useState(true);
   const audioRef = useRef<HTMLAudioElement>(null);
-  const mobile = isMobileDevice();
 
   // Проверяем, находится ли текущий пользователь в разговоре
   const isUserInCall = useMemo(() => {
@@ -140,24 +134,11 @@ const BridgeManager: React.FC = () => {
         if (state === 'Established') {
           setIsConnecting(false);
           dispatch(setCallStatus('active'));
-          // Включаем звук на мобильных устройствах
-          if (audioRef.current && mobile) {
-            audioRef.current.play().catch(err => {
-              console.warn('Failed to play audio:', err);
-            });
-          }
         } else if (state === 'Terminated' || state === 'Canceled') {
           setIsConnecting(false);
           dispatch(setCallStatus('idle'));
         }
       };
-
-      // Пытаемся включить звук сразу при клике (для мобильных)
-      if (audioRef.current && mobile) {
-        audioRef.current.play().catch(err => {
-          console.warn('Failed to play audio on click:', err);
-        });
-      }
 
       await sipService.makeCall(
         dialTarget,
@@ -228,20 +209,6 @@ const BridgeManager: React.FC = () => {
       }
     }
   }, [sessionState, callStatus, dispatch]);
-
-  useEffect(() => {
-    if (audioRef.current) {
-      // Просто управление громкостью (1 — громкая, 0.2 — "наушник", хоть примерно)
-      audioRef.current.volume = speakerOn ? 1 : 0.2;
-      audioRef.current.muted = false;
-      // Пытаемся включить звук при изменении режима (для мобильных)
-      if (mobile && isUserInCall) {
-        audioRef.current.play().catch(err => {
-          console.warn('Failed to play audio on speaker toggle:', err);
-        });
-      }
-    }
-  }, [speakerOn, mobile, isUserInCall]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -362,27 +329,7 @@ const BridgeManager: React.FC = () => {
           </div>
           {bridgeParticipants.length > 0 && isUserInCall && (
             <>
-              {mobile && (
-                <button
-                  style={{
-                    margin: '12px 0',
-                    padding: '7px 14px',
-                    borderRadius: 6,
-                    border: '1px solid #ccc',
-                  }}
-                  onClick={() => {
-                    setSpeakerOn((prev) => !prev);
-                    // Принудительно включаем звук при клике
-                    if (audioRef.current) {
-                      audioRef.current.play().catch(err => {
-                        console.warn('Failed to play audio on button click:', err);
-                      });
-                    }
-                  }}
-                >
-                  {speakerOn ? '🔊 Громкая связь' : '🦻 В наушник'}
-                </button>
-              )}
+              <CallAudioControls audioRef={audioRef} />
               <BridgeParticipantsList participants={bridgeParticipants} onHangup={handleHangup} />
             </>
           )}
