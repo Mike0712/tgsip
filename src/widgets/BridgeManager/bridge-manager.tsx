@@ -140,11 +140,24 @@ const BridgeManager: React.FC = () => {
         if (state === 'Established') {
           setIsConnecting(false);
           dispatch(setCallStatus('active'));
+          // Включаем звук на мобильных устройствах
+          if (audioRef.current && mobile) {
+            audioRef.current.play().catch(err => {
+              console.warn('Failed to play audio:', err);
+            });
+          }
         } else if (state === 'Terminated' || state === 'Canceled') {
           setIsConnecting(false);
           dispatch(setCallStatus('idle'));
         }
       };
+
+      // Пытаемся включить звук сразу при клике (для мобильных)
+      if (audioRef.current && mobile) {
+        audioRef.current.play().catch(err => {
+          console.warn('Failed to play audio on click:', err);
+        });
+      }
 
       await sipService.makeCall(
         dialTarget,
@@ -221,8 +234,14 @@ const BridgeManager: React.FC = () => {
       // Просто управление громкостью (1 — громкая, 0.2 — "наушник", хоть примерно)
       audioRef.current.volume = speakerOn ? 1 : 0.2;
       audioRef.current.muted = false;
+      // Пытаемся включить звук при изменении режима (для мобильных)
+      if (mobile && isUserInCall) {
+        audioRef.current.play().catch(err => {
+          console.warn('Failed to play audio on speaker toggle:', err);
+        });
+      }
     }
-  }, [speakerOn]);
+  }, [speakerOn, mobile, isUserInCall]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -351,7 +370,15 @@ const BridgeManager: React.FC = () => {
                     borderRadius: 6,
                     border: '1px solid #ccc',
                   }}
-                  onClick={() => setSpeakerOn((prev) => !prev)}
+                  onClick={() => {
+                    setSpeakerOn((prev) => !prev);
+                    // Принудительно включаем звук при клике
+                    if (audioRef.current) {
+                      audioRef.current.play().catch(err => {
+                        console.warn('Failed to play audio on button click:', err);
+                      });
+                    }
+                  }}
                 >
                   {speakerOn ? '🔊 Громкая связь' : '🦻 В наушник'}
                 </button>
