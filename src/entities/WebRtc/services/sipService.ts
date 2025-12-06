@@ -6,6 +6,12 @@ class SipService {
   private userAgent: UserAgent | null = null;
   private registerer: Registerer | null = null;
   private session: Inviter | Invitation | object = {};
+  private audioContext: AudioContext | null = null;
+  private gainNode: GainNode | null = null;
+  private audioSource: MediaStreamAudioSourceNode | null = null;
+  private audioDestination: MediaStreamAudioDestinationNode | null = null;
+  private currentVolume: number = 1.0;
+  private isMuted: boolean = false;
 
   constructor(private host: string | null, private port: number | null, private username: string, private password: string, private turnServer: string | null) { }
 
@@ -210,6 +216,7 @@ class SipService {
   hangup() {
     if (this.session instanceof Session && this.session.state !== SessionState.Terminated) {
       this.session.bye();
+      this.cleanupAudioResources();
       store.dispatch(setHangup(false));
     }
   }
@@ -233,44 +240,182 @@ class SipService {
 
   private setupRemoteMedia() {
     const mediaElement = document.getElementById('mediaElement') as HTMLMediaElement | null;
+    if (!mediaElement) {
+      console.error('❌ mediaElement not found');
+      return;
+    }
+
+    mediaElement.addEventListener('error', console.error);
+    mediaElement.addEventListener('suspend', console.log);
+    mediaElement.addEventListener('abort', console.log);
+    mediaElement.addEventListener('volumechange', console.log);
+    mediaElement.addEventListener('ended', console.log);
+
+    if (!(this.session instanceof Session)) {
+      console.error('❌ No active session');
+      return;
+    }
+
+    const peerConnection = (this.session.sessionDescriptionHandler as any)?.peerConnection;
+    if (!peerConnection) {
+      console.error('❌ No peer connection');
+      return;
+    }
+
+    // Собираем remote audio tracks
     const remoteStream = new MediaStream();
-    if (mediaElement) {
-      mediaElement.addEventListener('error', console.error);
-      mediaElement.addEventListener('suspend', console.log);
-      mediaElement.addEventListener('abort', console.log);
-      mediaElement.addEventListener('volumechange', console.log);
-      mediaElement.addEventListener('ended', console.log);
-      if (this.session instanceof Session) {
-        const peerConnection = (this.session.sessionDescriptionHandler as any)?.peerConnection;
-        if (peerConnection) {
-          for (const receiver of peerConnection.getReceivers()) {
-            if (receiver.track) {
-              remoteStream.addTrack(receiver.track);
-              console.log('🎵 Added remote track:', receiver.track.kind);
-            }
-          }
-        }
+    for (const receiver of peerConnection.getReceivers()) {
+      if (receiver.track && receiver.track.kind === 'audio') {
+        remoteStream.addTrack(receiver.track);
+        console.log('🎵 Added remote audio track');
       }
-      mediaElement.srcObject = remoteStream;
-      mediaElement.volume = 1.0;
+    }
+
+    if (remoteStream.getAudioTracks().length === 0) {
+      console.warn('⚠️ No remote audio tracks found');
+      return;
+    }
+
+    try {
+      // Создаем AudioContext для управления громкостью через Web Audio API
+      this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      
+      // Создаем узлы Web Audio API
+      this.audioSource = this.audioContext.createMediaStreamSource(remoteStream);
+      this.gainNode = this.audioContext.createGain();
+      this.audioDestination = this.audioContext.createMediaStreamDestination();
+      
+      // Подключаем цепочку: source -> gain -> destination
+      this.audioSource.connect(this.gainNode);
+      this.gainNode.connect(this.audioDestination);
+      
+      // Устанавливаем начальную громкость и muted состояние
+      this.gainNode.gain.value = this.currentVolume;
+      this.updateMutedState();
+      
+      // Подключаем обработанный поток к audio элементу
+      mediaElement.srcObject = this.audioDestination.stream;
+      mediaElement.volume = 1.0; // Всегда на максимуме, громкость контролируется через gainNode
       
       // Критично для iOS/Safari
       mediaElement.setAttribute('playsinline', 'true');
       mediaElement.setAttribute('autoplay', 'true');
       
-      console.log('🔊 Starting remote media playback...');
+      console.log('🔊 Starting remote media playback with Web Audio API...');
       return mediaElement.play()
-        .then(() => console.log('✅ Remote audio playing'))
+        .then(() => console.log('✅ Remote audio playing with volume control'))
         .catch(err => {
           console.error('❌ Audio playback failed:', err);
-          // Уведомляем UI что нужен user interaction
           window.dispatchEvent(new Event('audio-play-failed'));
-          // Попытка воспроизведения после user interaction
           document.addEventListener('click', () => {
             mediaElement.play().catch(console.error);
           }, { once: true });
         });
+    } catch (error) {
+      console.error('❌ Failed to setup Web Audio API, falling back to direct stream:', error);
+      // Fallback: используем прямой поток без Web Audio API
+      mediaElement.srcObject = remoteStream;
+      mediaElement.volume = this.currentVolume;
+      mediaElement.muted = this.isMuted;
+      
+      mediaElement.setAttribute('playsinline', 'true');
+      mediaElement.setAttribute('autoplay', 'true');
+      
+      return mediaElement.play()
+        .then(() => console.log('✅ Remote audio playing (fallback mode)'))
+        .catch(err => {
+          console.error('❌ Audio playback failed:', err);
+          window.dispatchEvent(new Event('audio-play-failed'));
+        });
     }
+  }
+
+  // Установка громкости через Web Audio API
+  setVolume(volume: number) {
+    this.currentVolume = Math.max(0, Math.min(2, volume)); // Ограничиваем от 0 до 2
+    
+    if (this.gainNode) {
+      // Учитываем muted состояние: если muted, gain остается 0, иначе устанавливаем volume
+      this.gainNode.gain.value = this.isMuted ? 0 : this.currentVolume;
+      console.log(`🔊 Volume set via Web Audio API: ${this.currentVolume}, muted: ${this.isMuted}`);
+    } else {
+      // Fallback: используем audio элемент напрямую
+      const mediaElement = document.getElementById('mediaElement') as HTMLMediaElement | null;
+      if (mediaElement) {
+        mediaElement.volume = this.currentVolume;
+        console.log(`🔊 Volume set via audio element: ${this.currentVolume}`);
+      }
+    }
+  }
+
+  // Установка muted состояния
+  setMuted(muted: boolean) {
+    this.isMuted = muted;
+    this.updateMutedState();
+  }
+
+  private updateMutedState() {
+    if (this.gainNode) {
+      // Через Web Audio API: устанавливаем gain в 0 для mute, иначе используем текущую громкость
+      this.gainNode.gain.value = this.isMuted ? 0 : this.currentVolume;
+      console.log(`🔇 Muted state via Web Audio API: ${this.isMuted}, volume: ${this.currentVolume}`);
+    } else {
+      // Fallback: используем audio элемент
+      const mediaElement = document.getElementById('mediaElement') as HTMLMediaElement | null;
+      if (mediaElement) {
+        mediaElement.muted = this.isMuted;
+        console.log(`🔇 Muted state via audio element: ${this.isMuted}`);
+      }
+    }
+  }
+
+  // Получить текущую громкость
+  getVolume(): number {
+    return this.currentVolume;
+  }
+
+  // Получить muted состояние
+  getMuted(): boolean {
+    return this.isMuted;
+  }
+
+  private cleanupAudioResources() {
+    // Отключаем и закрываем Web Audio API ресурсы
+    if (this.audioSource) {
+      try {
+        this.audioSource.disconnect();
+      } catch (e) {
+        console.warn('Error disconnecting audio source:', e);
+      }
+      this.audioSource = null;
+    }
+    
+    if (this.gainNode) {
+      try {
+        this.gainNode.disconnect();
+      } catch (e) {
+        console.warn('Error disconnecting gain node:', e);
+      }
+      this.gainNode = null;
+    }
+    
+    if (this.audioDestination) {
+      try {
+        this.audioDestination.disconnect();
+      } catch (e) {
+        console.warn('Error disconnecting audio destination:', e);
+      }
+      this.audioDestination = null;
+    }
+    
+    if (this.audioContext && this.audioContext.state !== 'closed') {
+      this.audioContext.close().catch(err => {
+        console.warn('Error closing audio context:', err);
+      });
+      this.audioContext = null;
+    }
+    
+    console.log('🧹 Audio resources cleaned up');
   }
 
   private listenSessionState(state: string) {
@@ -279,6 +424,7 @@ class SipService {
         this.setupRemoteMedia();
         break;
       case SessionState.Terminated:
+        this.cleanupAudioResources();
         break;
     }
   }
