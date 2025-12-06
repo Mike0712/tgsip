@@ -231,6 +231,45 @@ class SipService {
     }
   }
 
+  toggleMute() {
+    if (!(this.session instanceof Session)) {
+      console.warn('⚠️ No active session for toggleMute');
+      return false;
+    }
+
+    const peerConnection = (this.session.sessionDescriptionHandler as any)?.peerConnection;
+    if (!peerConnection) {
+      console.warn('⚠️ No peer connection for toggleMute');
+      return false;
+    }
+
+    // Получаем все local audio tracks через senders
+    const senders = peerConnection.getSenders();
+    let currentMutedState: boolean | null = null;
+    let hasAudioTracks = false;
+
+    for (const sender of senders) {
+      if (sender.track && sender.track.kind === 'audio') {
+        hasAudioTracks = true;
+        // Определяем текущее состояние по первому треку (muted = !enabled)
+        if (currentMutedState === null) {
+          currentMutedState = !sender.track.enabled;
+        }
+        // Переключаем: устанавливаем enabled в противоположное значение
+        sender.track.enabled = !currentMutedState;
+        console.log(`🔇 Local audio track ${sender.track.enabled ? 'unmuted' : 'muted'}`);
+      }
+    }
+
+    if (!hasAudioTracks) {
+      console.warn('⚠️ No local audio tracks found for toggleMute');
+      return false;
+    }
+
+    // Возвращаем новое состояние (muted = !enabled)
+    return !currentMutedState;
+  }
+
   private setupRemoteMedia() {
     const mediaElement = document.getElementById('mediaElement') as HTMLMediaElement | null;
     const remoteStream = new MediaStream();
