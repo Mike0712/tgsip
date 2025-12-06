@@ -37,7 +37,7 @@ const handler = async (req: AuthenticatedRequest, res: NextApiResponse) => {
         'metadata',
         'created_at',
         'updated_at',
-      );
+      ).where('status', '!=', 'left');
 
     return res.status(200).json({
       success: true,
