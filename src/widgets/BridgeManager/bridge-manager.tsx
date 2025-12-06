@@ -55,7 +55,27 @@ const BridgeManager: React.FC = () => {
   const { subscribe, unsubscribe, on, off } = useSSE(user?.id ? user.id.toString() : "");
   const searchParams = useSearchParams();
   const [isConnecting, setIsConnecting] = useState(false);
-  const audioRef = useRef<HTMLAudioElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  
+  // Инициализируем ref из глобального элемента
+  useEffect(() => {
+    const updateAudioRef = () => {
+      if (typeof document !== 'undefined') {
+        const mediaElement = document.getElementById('mediaElement') as HTMLAudioElement;
+        if (mediaElement) {
+          audioRef.current = mediaElement;
+        }
+      }
+    };
+    
+    // Проверяем сразу
+    updateAudioRef();
+    
+    // Также проверяем периодически на случай, если элемент создается позже
+    const interval = setInterval(updateAudioRef, 100);
+    
+    return () => clearInterval(interval);
+  }, []);
 
   // Проверяем, находится ли текущий пользователь в разговоре
   const isUserInCall = useMemo(() => {
@@ -335,12 +355,6 @@ const BridgeManager: React.FC = () => {
           )}
         </>
       )}
-      <audio
-        id="mediaElement"
-        ref={audioRef}
-        autoPlay
-        playsInline
-      />
     </div>
   );
 };
