@@ -17,6 +17,7 @@ interface CallAudioControlsProps {
 export const CallAudioControls: React.FC<CallAudioControlsProps> = ({ audioRef }) => {
   const [speakerOn, setSpeakerOn] = useState(true);
   const [audioEnabled, setAudioEnabled] = useState(!isMobileDevice()); // На mobile по умолчанию выключен, на desktop включен
+  const [microphoneMuted, setMicrophoneMuted] = useState(false);
   const mobile = isMobileDevice();
   const dispatch = useDispatch();
 
@@ -51,8 +52,7 @@ export const CallAudioControls: React.FC<CallAudioControlsProps> = ({ audioRef }
     const newAudioEnabled = !audioEnabled;
     console.log(`[CallAudioControls] Toggling microphone: ${audioEnabled} -> ${newAudioEnabled}`);
     setAudioEnabled(newAudioEnabled);
-    dispatch(setToggleMute(newAudioEnabled));
-    
+
     // Не устанавливаем muted здесь - пусть useEffect это делает синхронно
     // Но пытаемся включить звук при включении
     if (newAudioEnabled && audioRef.current) {
@@ -61,6 +61,13 @@ export const CallAudioControls: React.FC<CallAudioControlsProps> = ({ audioRef }
         console.warn('Failed to play audio on microphone toggle:', err);
       });
     }
+  };
+
+  const handleMicrophoneMuteToggle = () => {
+    const newMutedState = !microphoneMuted;
+    setMicrophoneMuted(newMutedState);
+    console.log(`[CallAudioControls] Toggling microphone mute: ${microphoneMuted} -> ${newMutedState}`);
+    dispatch(setToggleMute(true));
   };
 
   const handleSpeakerToggle = () => {
@@ -84,7 +91,7 @@ export const CallAudioControls: React.FC<CallAudioControlsProps> = ({ audioRef }
 
   return (
     <div className={cls.container}>
-      {/* Иконка микрофона */}
+      {/* Иконка вывода звука */}
       <button
         onClick={handleMicrophoneToggle}
         className={cls.microphoneButton}
@@ -92,9 +99,26 @@ export const CallAudioControls: React.FC<CallAudioControlsProps> = ({ audioRef }
         aria-label={audioEnabled ? 'Выключить звук' : 'Включить звук'}
       >
         <span className={cls.microphoneIcon} role="img" aria-hidden="true">
-          🎙️
+          🔊
         </span>
         {!audioEnabled && (
+          <span className={cls.microphoneDisabled}>
+            <span className={cls.microphoneDisabledLine}></span>
+          </span>
+        )}
+      </button>
+
+      {/* Иконка микрофона (mute/unmute) */}
+      <button
+        onClick={handleMicrophoneMuteToggle}
+        className={cls.microphoneButton}
+        title={microphoneMuted ? 'Микрофон выключен. Нажми, чтобы включить.' : 'Микрофон включен. Нажми, чтобы выключить.'}
+        aria-label={microphoneMuted ? 'Включить микрофон' : 'Выключить микрофон'}
+      >
+        <span className={cls.microphoneIcon} role="img" aria-hidden="true">
+          🎙️
+        </span>
+        {microphoneMuted && (
           <span className={cls.microphoneDisabled}>
             <span className={cls.microphoneDisabledLine}></span>
           </span>
