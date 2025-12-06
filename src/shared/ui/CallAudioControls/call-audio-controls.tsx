@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import cls from './call-audio-controls.module.css';
 import { useDispatch } from 'react-redux';
 import { setToggleMute } from '@/entities/WebRtc/model/slice';
+import { getSipServiceInstance } from '@/entities/WebRtc/services/sipServiceInstance';
 
 function isMobileDevice() {
   if (typeof navigator === 'undefined') return false;
@@ -64,10 +65,14 @@ export const CallAudioControls: React.FC<CallAudioControlsProps> = ({ audioRef }
   };
 
   const handleMicrophoneMuteToggle = () => {
-    const newMutedState = !microphoneMuted;
-    setMicrophoneMuted(newMutedState);
-    console.log(`[CallAudioControls] Toggling microphone mute: ${microphoneMuted} -> ${newMutedState}`);
-    dispatch(setToggleMute(true));
+    const sipService = getSipServiceInstance();
+    if (sipService) {
+      const newMutedState = sipService.toggleMute();
+      console.log(`[CallAudioControls] Toggling microphone mute, new state: ${newMutedState}`);
+      setMicrophoneMuted(newMutedState);
+    } else {
+      console.warn('[CallAudioControls] SipService not available for toggleMute');
+    }
   };
 
   const handleSpeakerToggle = () => {
@@ -126,14 +131,14 @@ export const CallAudioControls: React.FC<CallAudioControlsProps> = ({ audioRef }
       </button>
 
       {/* Кнопка переключения громкой связи (только когда звук включен) */}
-      {audioEnabled && mobile && (
+      {/* {audioEnabled && mobile && (
         <button
           onClick={handleSpeakerToggle}
           className={cls.speakerButton}
         >
           {speakerOn ? '🔊 Громкая связь' : '🦻 В наушник'}
         </button>
-      )}
+      )} */}
     </div>
   );
 };

@@ -245,8 +245,11 @@ class SipService {
 
     // Получаем все local audio tracks через senders
     const senders = peerConnection.getSenders();
+    console.log(`[toggleMute] Found ${senders.length} senders`);
+    
     let currentMutedState: boolean | null = null;
     let hasAudioTracks = false;
+    let newMutedState = false;
 
     for (const sender of senders) {
       if (sender.track && sender.track.kind === 'audio') {
@@ -254,10 +257,13 @@ class SipService {
         // Определяем текущее состояние по первому треку (muted = !enabled)
         if (currentMutedState === null) {
           currentMutedState = !sender.track.enabled;
+          newMutedState = !currentMutedState; // Переключаем состояние
+          console.log(`[toggleMute] Current muted state: ${currentMutedState}, switching to: ${newMutedState}`);
         }
         // Переключаем: устанавливаем enabled в противоположное значение
-        sender.track.enabled = !currentMutedState;
-        console.log(`🔇 Local audio track ${sender.track.enabled ? 'unmuted' : 'muted'}`);
+        const oldEnabled = sender.track.enabled;
+        sender.track.enabled = newMutedState ? false : true; // enabled = !muted
+        console.log(`🔇 Local audio track ${oldEnabled ? 'enabled' : 'disabled'} -> ${sender.track.enabled ? 'enabled' : 'disabled'}`);
       }
     }
 
@@ -267,7 +273,7 @@ class SipService {
     }
 
     // Возвращаем новое состояние (muted = !enabled)
-    return !currentMutedState;
+    return newMutedState;
   }
 
   private setupRemoteMedia() {
