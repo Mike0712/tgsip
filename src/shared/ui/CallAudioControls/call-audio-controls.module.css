@@ -1,0 +1,63 @@
+.container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.microphoneButton {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 1px solid #d1d5db;
+  background-color: white;
+  transition: background-color 0.2s;
+  cursor: pointer;
+}
+
+.microphoneButton:hover {
+  background-color: #f9fafb;
+}
+
+.microphoneIcon {
+  font-size: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.microphoneDisabled {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.microphoneDisabledLine {
+  display: block;
+  width: 40px;
+  height: 2px;
+  background-color: #ef4444;
+  transform: rotate(45deg);
+}
+
+.speakerButton {
+  padding: 7px 14px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  background-color: white;
+  transition: background-color 0.2s;
+  cursor: pointer;
+}
+
+.speakerButton:hover {
+  background-color: #f9fafb;
+}
