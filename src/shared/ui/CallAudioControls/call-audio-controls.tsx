@@ -2,6 +2,8 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import cls from './call-audio-controls.module.css';
+import { useDispatch } from 'react-redux';
+import { setToggleMute } from '@/entities/WebRtc/model/slice';
 
 function isMobileDevice() {
   if (typeof navigator === 'undefined') return false;
@@ -16,6 +18,7 @@ export const CallAudioControls: React.FC<CallAudioControlsProps> = ({ audioRef }
   const [speakerOn, setSpeakerOn] = useState(true);
   const [audioEnabled, setAudioEnabled] = useState(!isMobileDevice()); // На mobile по умолчанию выключен, на desktop включен
   const mobile = isMobileDevice();
+  const dispatch = useDispatch();
 
   useEffect(() => {
     if (audioRef.current) {
@@ -48,6 +51,7 @@ export const CallAudioControls: React.FC<CallAudioControlsProps> = ({ audioRef }
     const newAudioEnabled = !audioEnabled;
     console.log(`[CallAudioControls] Toggling microphone: ${audioEnabled} -> ${newAudioEnabled}`);
     setAudioEnabled(newAudioEnabled);
+    dispatch(setToggleMute(newAudioEnabled));
     
     // Не устанавливаем muted здесь - пусть useEffect это делает синхронно
     // Но пытаемся включить звук при включении
