@@ -14,6 +14,9 @@ const SipStatus = () => {
   const hangup = useSelector((state: RootState) => state.sip.hangup);
   const selectedAccount = useSelector((state: RootState) => state.sip.selectedAccount);
   const selectedCallerId = useSelector((state: RootState) => state.sip.selectedCallerId);
+  const prevStatusRef = useRef<string | null>(null);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isReconnectingRef = useRef(false);
 
   const stateListener = (state: string) => {
     store.dispatch(setSessionState(state))
@@ -58,6 +61,66 @@ const SipStatus = () => {
       sipService?.hangup();
     }
   }, [hangup]);
+
+  // Автовосстановление при переходе из online в offline
+  useEffect(() => {
+    if (!selectedAccount) return;
+
+    const prevStatus = prevStatusRef.current;
+    prevStatusRef.current = status;
+
+    // Если был online и стал offline - запускаем переподключение
+    if (prevStatus === 'online' && status === 'offline' && !isReconnectingRef.current) {
+      isReconnectingRef.current = true;
+      console.log('🔄 SIP connection lost, attempting to reconnect...');
+
+      // Очищаем предыдущий таймаут если есть
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+
+      // Переподключаемся через небольшую задержку
+      reconnectTimeoutRef.current = setTimeout(() => {
+        if (selectedAccount && sipService) {
+          try {
+            // Пытаемся переинициализировать
+            sipService.initialize();
+            console.log('🔄 SIP Service reinitialized');
+            isReconnectingRef.current = false;
+          } catch (error) {
+            console.error('❌ Failed to reconnect SIP:', error);
+            // Если не получилось, пересоздаем сервис
+            sipService = new SipService(
+              selectedAccount.sip_server,
+              selectedAccount.sip_port,
+              selectedAccount.sip_username,
+              selectedAccount.secret,
+              selectedAccount.turn_server || null
+            );
+            sipService.initialize();
+            setSipServiceInstance(sipService);
+            console.log('🔄 SIP Service recreated and initialized');
+            isReconnectingRef.current = false;
+          }
+        }
+      }, 1500);
+    }
+
+    // Сбрасываем флаг переподключения когда статус снова становится online
+    if (status === 'online') {
+      isReconnectingRef.current = false;
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
+      }
+    }
+
+    return () => {
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+    };
+  }, [status, selectedAccount]);
 
   const audioRef = useRef<HTMLAudioElement>(null);
 
