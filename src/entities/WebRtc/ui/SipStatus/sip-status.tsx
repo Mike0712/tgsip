@@ -59,16 +59,7 @@ const SipStatus = () => {
     }
   }, [hangup]);
 
-  const [speakerOn, setSpeakerOn] = useState(true);
   const audioRef = useRef<HTMLAudioElement>(null);
-
-  useEffect(() => {
-    if (audioRef.current) {
-      // Просто управление громкостью (1 — громкая, 0.2 — "наушник", хоть примерно)
-      audioRef.current.volume = speakerOn ? 1 : 0.2;
-      audioRef.current.muted = false;
-    }
-  }, [speakerOn]);
 
   return (
     <div className={cls.sipStatus}>

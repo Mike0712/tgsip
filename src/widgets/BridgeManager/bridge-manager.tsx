@@ -15,6 +15,11 @@ import { BridgeParticipantsList } from './bridge-participants-list';
 import { BridgeShareBlock } from './bridge-share-block';
 import { useSSE } from '@/shared/lib/hooks/useSSE';
 
+function isMobileDevice() {
+  if (typeof navigator === 'undefined') return false;
+  return /android|iphone|ipad|ipod|mobile|ios|blackberry|iemobile|opera mini/i.test(navigator.userAgent);
+}
+
 const formatStatus = (status: ReturnType<typeof useBridgeDialer>['bridgeStatus']) => {
   switch (status) {
     case 'creating':
@@ -54,6 +59,9 @@ const BridgeManager: React.FC = () => {
   const { subscribe, unsubscribe, on, off } = useSSE(user?.id ? user.id.toString() : "");
   const searchParams = useSearchParams();
   const [isConnecting, setIsConnecting] = useState(false);
+  const [speakerOn, setSpeakerOn] = useState(true);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const mobile = isMobileDevice();
 
   // Проверяем, находится ли текущий пользователь в разговоре
   const isUserInCall = useMemo(() => {
@@ -209,6 +217,14 @@ const BridgeManager: React.FC = () => {
   }, [sessionState, callStatus, dispatch]);
 
   useEffect(() => {
+    if (audioRef.current) {
+      // Просто управление громкостью (1 — громкая, 0.2 — "наушник", хоть примерно)
+      audioRef.current.volume = speakerOn ? 1 : 0.2;
+      audioRef.current.muted = false;
+    }
+  }, [speakerOn]);
+
+  useEffect(() => {
     if (typeof window === 'undefined') {
       return;
     }
@@ -325,9 +341,32 @@ const BridgeManager: React.FC = () => {
               </div>
             )}
           </div>
-          {bridgeParticipants.length > 0 && isUserInCall && <BridgeParticipantsList participants={bridgeParticipants} onHangup={handleHangup} />}
+          {bridgeParticipants.length > 0 && isUserInCall && (
+            <>
+              {mobile && (
+                <button
+                  style={{
+                    margin: '12px 0',
+                    padding: '7px 14px',
+                    borderRadius: 6,
+                    border: '1px solid #ccc',
+                  }}
+                  onClick={() => setSpeakerOn((prev) => !prev)}
+                >
+                  {speakerOn ? '🔊 Громкая связь' : '🦻 В наушник'}
+                </button>
+              )}
+              <BridgeParticipantsList participants={bridgeParticipants} onHangup={handleHangup} />
+            </>
+          )}
         </>
       )}
+      <audio
+        id="mediaElement"
+        ref={audioRef}
+        autoPlay
+        playsInline
+      />
     </div>
   );
 };
