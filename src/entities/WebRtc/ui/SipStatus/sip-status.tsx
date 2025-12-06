@@ -8,11 +8,6 @@ import cls from './sip-status.module.css';
 
 let sipService: SipService | null = null;
 
-function isMobileDevice() {
-  if (typeof navigator === 'undefined') return false;
-  return /android|iphone|ipad|ipod|mobile|ios|blackberry|iemobile|opera mini/i.test(navigator.userAgent);
-}
-
 const SipStatus = () => {
   const status = useSelector((state: RootState) => state.sip.status);
   const answer = useSelector((state: RootState) => state.sip.answer);
@@ -66,7 +61,6 @@ const SipStatus = () => {
 
   const [speakerOn, setSpeakerOn] = useState(true);
   const audioRef = useRef<HTMLAudioElement>(null);
-  const mobile = isMobileDevice();
 
   useEffect(() => {
     if (audioRef.current) {
@@ -85,19 +79,6 @@ const SipStatus = () => {
         <div className="text-xs text-gray-500">
           {selectedAccount.sip_username}@{selectedAccount.sip_server}
         </div>
-      )}
-      {mobile && (
-        <button
-          style={{
-            margin: '12px 0',
-            padding: '7px 14px',
-            borderRadius: 6,
-            border: '1px solid #ccc',
-          }}
-          onClick={() => setSpeakerOn((prev) => !prev)}
-        >
-          {speakerOn ? '🔊 Громкая связь' : '🦻 В наушник'}
-        </button>
       )}
       <audio
         id="mediaElement"
