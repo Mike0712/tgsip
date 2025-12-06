@@ -19,9 +19,19 @@ export const CallAudioControls: React.FC<CallAudioControlsProps> = ({ audioRef }
 
   useEffect(() => {
     if (audioRef.current) {
-      // Управление громкостью (1 — громкая, 0.2 — "наушник")
-      audioRef.current.volume = speakerOn ? 1 : 0.2;
-      audioRef.current.muted = !audioEnabled;
+      // Управление громкостью: на мобильных переключаем между 1 (громкая) и 0.2 (наушник)
+      // На десктопе всегда громкость 1
+      const targetVolume = mobile ? (speakerOn ? 1 : 0.2) : 1;
+      
+      // Устанавливаем громкость с небольшой задержкой, чтобы убедиться что элемент готов
+      const timer = setTimeout(() => {
+        if (audioRef.current) {
+          audioRef.current.volume = targetVolume;
+          audioRef.current.muted = !audioEnabled;
+          
+          console.log(`[CallAudioControls] Volume set: ${audioRef.current.volume}, speakerOn: ${speakerOn}, mobile: ${mobile}, muted: ${!audioEnabled}`);
+        }
+      }, 0);
       
       // Пытаемся включить звук при изменении режима (для мобильных)
       if (mobile && audioEnabled && audioRef.current.paused) {
@@ -29,6 +39,8 @@ export const CallAudioControls: React.FC<CallAudioControlsProps> = ({ audioRef }
           console.warn('Failed to play audio on speaker toggle:', err);
         });
       }
+      
+      return () => clearTimeout(timer);
     }
   }, [speakerOn, audioEnabled, mobile, audioRef]);
 
@@ -49,7 +61,16 @@ export const CallAudioControls: React.FC<CallAudioControlsProps> = ({ audioRef }
   };
 
   const handleSpeakerToggle = () => {
-    setSpeakerOn((prev) => !prev);
+    setSpeakerOn((prev) => {
+      const newValue = !prev;
+      console.log(`[CallAudioControls] Toggling speaker: ${prev} -> ${newValue}`);
+      // Сразу устанавливаем громкость при переключении (только на мобильных)
+      if (audioRef.current && mobile) {
+        audioRef.current.volume = newValue ? 1 : 0.2;
+        console.log(`[CallAudioControls] Volume set to: ${audioRef.current.volume}`);
+      }
+      return newValue;
+    });
     // Принудительно включаем звук при клике
     if (audioRef.current && audioEnabled) {
       audioRef.current.play().catch(err => {
