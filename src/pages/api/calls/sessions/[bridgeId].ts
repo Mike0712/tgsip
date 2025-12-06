@@ -25,6 +25,7 @@ const handler = async (req: AuthenticatedRequest, res: NextApiResponse) => {
 
     const participants = await db('call_session_participants')
       .where({ session_id: session.id })
+      .andWhere('status', '!=', 'left')
       .select(
         'id',
         'session_id',
@@ -37,7 +38,7 @@ const handler = async (req: AuthenticatedRequest, res: NextApiResponse) => {
         'metadata',
         'created_at',
         'updated_at',
-      ).where('status', '!=', 'left');
+      );
 
     return res.status(200).json({
       success: true,
