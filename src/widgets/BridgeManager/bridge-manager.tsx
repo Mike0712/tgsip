@@ -187,13 +187,16 @@ const BridgeManager: React.FC = () => {
   useEffect(() => {
     if (!user?.id || !bridgeSession?.id) return;
     subscribe('participant_joined', bridgeSession.id);
+    subscribe('participant_left', bridgeSession.id);
     const handler = (data: any) => {
       refreshSession();
     };
     on('participant_joined', handler);
     return () => {
       unsubscribe('participant_joined', bridgeSession.id);
+      unsubscribe('participant_left', bridgeSession.id);
       off('participant_joined', handler);
+      off('participant_left', handler);
     };
   }, [user?.id, bridgeSession?.id]);
 
