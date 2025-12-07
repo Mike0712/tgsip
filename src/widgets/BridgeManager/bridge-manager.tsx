@@ -192,6 +192,7 @@ const BridgeManager: React.FC = () => {
       refreshSession();
     };
     on('participant_joined', handler);
+    on('participant_left', handler);
     return () => {
       unsubscribe('participant_joined', bridgeSession.id);
       unsubscribe('participant_left', bridgeSession.id);
