@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { userService, sessionService } from '../../../lib/database';
 import { createToken, validateTelegramData } from '../../../lib/auth';
+import logger from '../logger';
 
 interface TelegramUser {
   id: number;
@@ -22,7 +23,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const isDev = process.env.NODE_ENV === 'development';
     const { initData, user: userFromBody } = req.body;
     
-    console.log('📥 Telegram auth request:', {
+    logger.info({
+      message: '📥 Telegram auth request',
       hasInitData: !!initData,
       hasUserFromBody: !!userFromBody,
       initDataLength: initData?.length,
@@ -44,7 +46,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           auth_date = String(Math.floor(Date.now() / 1000));
           hash = 'dev_mode';
         } catch (error) {
-          console.error('❌ Failed to parse user in dev mode:', error);
+          logger.error(error, '❌ Failed to parse user in dev mode');
           return res.status(400).json({ error: 'Invalid user data in dev mode' });
         }
       } else if (initData) {
@@ -77,23 +79,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       hash = urlParams.get('hash') || '';
       query_id = urlParams.get('query_id') || undefined;
 
-      console.log('🔍 Parsed initData:', {
-        hasUser: !!userStr,
-        hasAuthDate: !!auth_date,
-        hasHash: !!hash,
-        hasQueryId: !!query_id,
-        authDate: auth_date,
-        userPreview: userStr?.substring(0, 100),
-      });
-
       parsedUser = userStr ? JSON.parse(userStr) : null;
     }
     if (!parsedUser?.id) {
-      console.error('❌ No user in initData');
+      logger.error('❌ No user in initData');
       return res.status(401).json({ error: 'Invalid Telegram init data: no user' });
     }
 
-    console.log('✅ User parsed:', { userId: parsedUser.id, username: parsedUser.username });
+    logger.info({ message: '✅ User parsed', userId: parsedUser.id, username: parsedUser.username });
 
     // Проверяем подпись (только в продакшене)
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
@@ -107,26 +100,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           params[key] = decodeURIComponent(value);
         }
       }
-      
-      console.log('🔐 Validating Telegram signature in production...', {
-        hasBotToken: !!botToken,
-        dataKeys: Object.keys(params),
-        hash: hash ? 'present' : 'missing'
-      });
-      
-      const isValid = validateTelegramData({ ...params, hash }, botToken);
+            
+      const isValid = validateTelegramData(initData, botToken);
       if (!isValid) {
-        console.error('❌ Telegram signature validation failed', {
+        logger.error({
           dataKeys: Object.keys(params),
           hash,
           hasBotToken: !!botToken
-        });
+        }, '❌ Telegram signature validation failed');
         // return res.status(401).json({ error: 'Invalid Telegram data signature' });
       } else {
-        console.log('✅ Telegram signature valid');
+        logger.info('✅ Telegram signature valid');
       }
     } else if (!isDev && !botToken) {
-      console.error('❌ Production mode but TELEGRAM_BOT_TOKEN is missing');
+      logger.error('❌ Production mode but TELEGRAM_BOT_TOKEN is missing');
       return res.status(500).json({ error: 'Server configuration error' });
     }
 
@@ -136,41 +123,40 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const now = Date.now();
       const ageInHours = (now - authDate) / (1000 * 60 * 60);
       
-      console.log('⏰ Auth date check:', {
+      logger.info({
         authDate: new Date(authDate).toISOString(),
         now: new Date(now).toISOString(),
         ageInHours: ageInHours.toFixed(2),
         isValid: now - authDate <= 24 * 60 * 60 * 1000
-      });
+      }, '⏰ Auth date check');
       
       if (isNaN(authDate) || now - authDate > 24 * 60 * 60 * 1000) {
-        console.error('❌ Telegram data is too old or invalid:', { 
+        logger.error({ 
           authDate: auth_date,
           parsedAuthDate: authDate,
           ageInHours: ageInHours.toFixed(2),
           isNaN: isNaN(authDate)
-        });
+        }, '❌ Telegram data is too old or invalid');
         return res.status(401).json({ error: 'Telegram data is too old' });
       }
     } else if (!isDev) {
-      console.error('❌ Production mode but auth_date is missing');
+      logger.error('❌ Production mode but auth_date is missing');
       return res.status(401).json({ error: 'Invalid Telegram init data: missing auth_date' });
     }
 
     // Проверяем существует ли пользователь в базе данных (по telegram_id)
-    console.log('🔍 Searching user in DB:', { telegramId: parsedUser.id, telegramIdType: typeof parsedUser.id });
+    logger.info({ telegramId: parsedUser.id, telegramIdType: typeof parsedUser.id }, '🔍 Searching user in DB');
     let user = await userService.findByTelegramId(String(parsedUser.id));
     
-    console.log('👤 User lookup result:', { 
+    logger.info({ 
       found: !!user, 
       userId: user?.id,
       telegramId: user?.telegram_id,
       telegramIdType: typeof user?.telegram_id
-    });
+    }, '👤 User lookup result');
     
     if (!user) {
-      // Пользователь не найден - доступ запрещен
-      console.error('❌ User not found in database:', { telegramId: parsedUser.id });
+      logger.error({ telegramId: parsedUser.id }, '❌ User not found in database');
       return res.status(403).json({ 
         success: false,
         error: 'Access denied',
@@ -203,13 +189,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const deviceInfo = req.headers['user-agent'];
     const ipAddress = req.headers['x-forwarded-for'] as string || (req.socket as any)?.remoteAddress;
     
-    console.log('🔐 Creating session...', {
+    logger.info({
       userId: user.id,
       tokenLength: token.length,
       expiresAt: expiresAt.toISOString(),
       deviceInfo: deviceInfo?.substring(0, 100),
       ipAddress
-    });
+    }, '🔐 Creating session');
     
     let session;
     try {
@@ -220,18 +206,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         deviceInfo,
         ipAddress
       );
-      console.log('✅ Session created successfully:', {
+      logger.info({
         sessionId: session.id,
         userId: session.user_id,
         expiresAt: session.expires_at
-      });
+      }, '✅ Session created successfully');
     } catch (sessionError: any) {
-      console.error('❌ Session creation failed:', {
+      logger.error({
         error: sessionError.message,
         stack: sessionError.stack,
         userId: user.id,
         errorCode: sessionError.code
-      });
+      }, '❌ Session creation failed');
       throw sessionError;
     }
 
@@ -249,7 +235,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
   } catch (error) {
-    console.error('Telegram auth error:', error);
+    logger.error(error, 'Telegram auth error');
     res.status(500).json({ error: 'Internal server error' });
   }
 }
