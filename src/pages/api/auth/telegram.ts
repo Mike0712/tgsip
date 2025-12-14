@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { userService, sessionService } from '../../../lib/database';
 import { createToken, validateTelegramData } from '../../../lib/auth';
+import logger from '../logger';
 
 interface TelegramUser {
   id: number;
@@ -22,7 +23,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const isDev = process.env.NODE_ENV === 'development';
     const { initData, user: userFromBody } = req.body;
     
-    console.log('📥 Telegram auth request:', {
+    logger.info({
+      message: '📥 Telegram auth request',
       hasInitData: !!initData,
       hasUserFromBody: !!userFromBody,
       initDataLength: initData?.length,
@@ -93,9 +95,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(401).json({ error: 'Invalid Telegram init data: no user' });
     }
 
-    console.log('✅ User parsed:', { userId: parsedUser.id, username: parsedUser.username });
-
-    // Проверяем подпись (только в продакшене)
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
     
     if (!isDev && botToken) {
@@ -108,7 +107,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
       }
       
-      console.log('🔐 Validating Telegram signature in production...', {
+      logger.info({
+        message: '🔐 Validating Telegram signature in production',
         hasBotToken: !!botToken,
         dataKeys: Object.keys(params),
         hash: hash ? 'present' : 'missing'

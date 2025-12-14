@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import jwt from 'jsonwebtoken';
 import { sessionService } from './database';
+import crypto from 'crypto';
 
 interface JWTPayload {
   userId: number;
@@ -73,49 +74,51 @@ export function createToken(payload: Omit<JWTPayload, 'iat' | 'exp'>): string {
   });
 }
 
-// Проверка Telegram данных
-export function validateTelegramData(data: any, botToken: string): boolean {
-  const crypto = require('crypto');
-  const { hash, ...userData } = data;
-  
-  if (!hash) {
-    console.error('❌ validateTelegramData: hash is missing');
+export function validateTelegramData(
+  initData: string,
+  botToken: string,
+  maxAgeSec = 24 * 60 * 60
+): boolean {
+  if (!initData) return false;
+
+  const params = new URLSearchParams(initData);
+
+  const hash = params.get("hash");
+  if (!hash) return false;
+
+  params.delete("hash");
+
+  const authDateStr = params.get("auth_date");
+  if (!authDateStr) return false;
+
+  const authDate = Number(authDateStr);
+  if (!Number.isFinite(authDate)) return false;
+
+  const nowSec = Math.floor(Date.now() / 1000);
+  if (nowSec - authDate > maxAgeSec) return false;
+
+  const keys = Array.from(params.keys()).sort();
+  const dataCheckString = keys
+    .map((k) => `${k}=${params.get(k) ?? ""}`)
+    .join("\n");
+
+  const secretKey = crypto
+    .createHmac("sha256", "WebAppData")
+    .update(botToken)
+    .digest("base64");
+
+  const computedHash = crypto
+    .createHmac("sha256", secretKey)
+    .update(dataCheckString)
+    .digest("hex");
+
+  // constant-time compare
+  try {
+    return crypto.timingSafeEqual(
+      new Uint8Array(Buffer.from(computedHash, "hex")),
+      new Uint8Array(Buffer.from(hash, "hex"))
+    );
+  } catch {
     return false;
   }
-  
-  // Создаем строку для проверки (важно: сортировка по алфавиту)
-  const dataCheckString = Object.keys(userData)
-    .sort()
-    .map(key => `${key}=${userData[key]}`)
-    .join('\n');
-  
-  console.log('🔐 Validation data:', {
-    keys: Object.keys(userData).sort(),
-    dataCheckString: dataCheckString.substring(0, 200),
-    hash: hash.substring(0, 20) + '...',
-    hasBotToken: !!botToken,
-  });
-  
-  // Создаем секретный ключ (botToken + 'WebAppData')
-  const secretKey = crypto.createHash('sha256').update(botToken + 'WebAppData').digest();
-  
-  // Создаем хеш
-  const hmac = crypto.createHmac('sha256', secretKey);
-  hmac.update(dataCheckString);
-  const calculatedHash = hmac.digest('hex');
-  
-  const isValid = calculatedHash === hash;
-  
-  if (!isValid) {
-    console.error('❌ Hash mismatch:', {
-      calculated: calculatedHash.substring(0, 20) + '...',
-      received: hash.substring(0, 20) + '...',
-      dataCheckStringLength: dataCheckString.length,
-      fullDataCheckString: dataCheckString,
-    });
-  } else {
-    console.log('✅ Hash matches');
-  }
-  
-  return isValid;
 }
