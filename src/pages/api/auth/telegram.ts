@@ -53,14 +53,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         try {
           parsedUser = typeof initData === 'string' ? JSON.parse(initData) : initData;
           auth_date = String(Math.floor(Date.now() / 1000));
-          hash = 'dev_mode';
         } catch (error) {
           const urlParams = new URLSearchParams(initData);
           const userStr = urlParams.get('user');
           if (userStr) {
             parsedUser = JSON.parse(userStr);
             auth_date = urlParams.get('auth_date') || String(Math.floor(Date.now() / 1000));
-            hash = urlParams.get('hash') || 'dev_mode';
+            hash = urlParams.get('hash') || '';
           }
         }
       }
