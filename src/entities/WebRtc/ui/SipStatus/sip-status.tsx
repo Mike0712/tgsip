@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useSelector } from 'react-redux';
 import store, { RootState } from "@/app/store";
 import SipService from '../../services/sipService';
-import { setSessionState } from '@/entities/WebRtc/model/slice';
+import { setSessionState, setToggleMute } from '@/entities/WebRtc/model/slice';
 import { setSipServiceInstance } from '../../services/sipServiceInstance';
 import { WakeLockManager } from '@/shared/ui/WakeLockManager/wake-lock-manager';
 import cls from './sip-status.module.css';
@@ -14,6 +14,7 @@ const SipStatus = () => {
   const sessionState = useSelector((state: RootState) => state.sip.sessionState);
   const answer = useSelector((state: RootState) => state.sip.answer);
   const hangup = useSelector((state: RootState) => state.sip.hangup);
+  const toggleMute = useSelector((state: RootState) => state.sip.toggleMute);
   const selectedAccount = useSelector((state: RootState) => state.sip.selectedAccount);
   const selectedCallerId = useSelector((state: RootState) => state.sip.selectedCallerId);
   const prevStatusRef = useRef<string | null>(null);
@@ -63,6 +64,13 @@ const SipStatus = () => {
       sipService?.hangup();
     }
   }, [hangup]);
+
+  useEffect(() => {
+    if (toggleMute) {
+      sipService?.toggleMute();
+      store.dispatch(setToggleMute(false));
+    }
+  }, [toggleMute]);
 
   // Автовосстановление при переходе из online в offline (только если НЕ в активной сессии)
   useEffect(() => {
