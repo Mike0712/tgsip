@@ -91,20 +91,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Проверяем подпись (только в продакшене)
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
     
-    if (!isDev && botToken) {
-      const params: Record<string, string> = {};
-      const pairs = initData.split('&');
-      for (const pair of pairs) {
-        const [key, value] = pair.split('=');
-        if (key && value && key !== 'hash' && key !== 'signature') {
-          params[key] = decodeURIComponent(value);
-        }
-      }
-            
+    if (!isDev && botToken) {            
       const isValid = validateTelegramData(initData, botToken);
       if (!isValid) {
         logger.error({
-          dataKeys: Object.keys(params),
+          initData,
           hash,
           hasBotToken: !!botToken
         }, '❌ Telegram signature validation failed');
