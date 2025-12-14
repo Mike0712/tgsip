@@ -231,6 +231,51 @@ class SipService {
     }
   }
 
+  toggleMute() {
+    if (!(this.session instanceof Session)) {
+      console.warn('⚠️ No active session for toggleMute');
+      return false;
+    }
+
+    const peerConnection = (this.session.sessionDescriptionHandler as any)?.peerConnection;
+    if (!peerConnection) {
+      console.warn('⚠️ No peer connection for toggleMute');
+      return false;
+    }
+
+    // Получаем все local audio tracks через senders
+    const senders = peerConnection.getSenders();
+    console.log(`[toggleMute] Found ${senders.length} senders`);
+    
+    let currentMutedState: boolean | null = null;
+    let hasAudioTracks = false;
+    let newMutedState = false;
+
+    for (const sender of senders) {
+      if (sender.track && sender.track.kind === 'audio') {
+        hasAudioTracks = true;
+        // Определяем текущее состояние по первому треку (muted = !enabled)
+        if (currentMutedState === null) {
+          currentMutedState = !sender.track.enabled;
+          newMutedState = !currentMutedState; // Переключаем состояние
+          console.log(`[toggleMute] Current muted state: ${currentMutedState}, switching to: ${newMutedState}`);
+        }
+        // Переключаем: устанавливаем enabled в противоположное значение
+        const oldEnabled = sender.track.enabled;
+        sender.track.enabled = newMutedState ? false : true; // enabled = !muted
+        console.log(`🔇 Local audio track ${oldEnabled ? 'enabled' : 'disabled'} -> ${sender.track.enabled ? 'enabled' : 'disabled'}`);
+      }
+    }
+
+    if (!hasAudioTracks) {
+      console.warn('⚠️ No local audio tracks found for toggleMute');
+      return false;
+    }
+
+    // Возвращаем новое состояние (muted = !enabled)
+    return newMutedState;
+  }
+
   private setupRemoteMedia() {
     const mediaElement = document.getElementById('mediaElement') as HTMLMediaElement | null;
     const remoteStream = new MediaStream();

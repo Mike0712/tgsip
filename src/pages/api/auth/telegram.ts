@@ -86,9 +86,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(401).json({ error: 'Invalid Telegram init data: no user' });
     }
 
+<<<<<<< HEAD
     logger.info({ message: '✅ User parsed', userId: parsedUser.id, username: parsedUser.username });
 
     // Проверяем подпись (только в продакшене)
+=======
+>>>>>>> master
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
     
     if (!isDev && botToken) {
@@ -100,10 +103,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           params[key] = decodeURIComponent(value);
         }
       }
+<<<<<<< HEAD
             
       const isValid = validateTelegramData(initData, botToken);
       if (!isValid) {
         logger.error({
+=======
+      
+      logger.info({
+        message: '🔐 Validating Telegram signature in production',
+        hasBotToken: !!botToken,
+        dataKeys: Object.keys(params),
+        hash: hash ? 'present' : 'missing'
+      });
+      
+      const isValid = validateTelegramData(initData, botToken);
+      if (!isValid) {
+        logger.error({
+          message: '❌ Telegram signature validation failed',
+>>>>>>> master
           dataKeys: Object.keys(params),
           hash,
           hasBotToken: !!botToken

@@ -21,6 +21,12 @@ const selectRandomServer = (servers: ServerRecord[]): ServerRecord | null => {
   return servers[index];
 };
 
+export class AsteriskApiError extends Error {
+  constructor(public status: number, message: string) {
+    super(message);
+  }
+}
+
 const resolveServerForUser = async (db: Knex, userId: number): Promise<ServerRecord | null> => {
   const record = await db('sip_accounts')
     .select<ServerRecord[]>('servers.id', 'servers.ip', 'servers.web_port', 'servers.url')
@@ -90,7 +96,7 @@ export const callAsterisk = async <T = unknown>(
     const errorPayload = contentType.includes('application/json')
       ? await response.json().catch(() => null)
       : await response.text();
-    throw new Error(
+    throw new AsteriskApiError(status,
       typeof errorPayload === 'string'
         ? `Asterisk API error: ${status} ${response.statusText} – ${errorPayload}`
         : `Asterisk API error: ${status} ${response.statusText}`,

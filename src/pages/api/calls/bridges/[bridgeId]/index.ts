@@ -1,6 +1,7 @@
 import type { NextApiResponse } from 'next';
 import { withAuth, AuthenticatedRequest } from '@/lib/auth';
-import { callAsterisk } from '@/pages/api/ariProxy';
+import { AsteriskApiError, callAsterisk } from '@/pages/api/ariProxy';
+import logger from '../../../logger';
 
 const handler = async (req: AuthenticatedRequest, res: NextApiResponse) => {
   const { bridgeId } = req.query as { bridgeId: string };
@@ -25,8 +26,12 @@ const handler = async (req: AuthenticatedRequest, res: NextApiResponse) => {
         return res.status(405).json({ success: false, error: 'Method not allowed' });
     }
   } catch (error) {
-    console.error('Bridge handler error:', error);
-    return res.status(502).json({ success: false, error: 'Failed to communicate with Asterisk API' });
+    logger.error(error as AsteriskApiError, `[/api/ari/bridges/${bridgeId}] Error`);
+    const status = (error as AsteriskApiError)?.status || 502;
+    if (status === 404) {
+      return res.status(404).json({ success: false, error: 'Сессия не найдена' });
+    }
+    return res.status(status).json({ success: false, error: 'Failed to communicate with Asterisk API' });
   }
 };
 

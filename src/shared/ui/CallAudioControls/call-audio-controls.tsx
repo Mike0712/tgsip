@@ -2,6 +2,9 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import cls from './call-audio-controls.module.css';
+import { useDispatch } from 'react-redux';
+import { setToggleMute } from '@/entities/WebRtc/model/slice';
+import { getSipServiceInstance } from '@/entities/WebRtc/services/sipServiceInstance';
 
 function isMobileDevice() {
   if (typeof navigator === 'undefined') return false;
@@ -15,7 +18,9 @@ interface CallAudioControlsProps {
 export const CallAudioControls: React.FC<CallAudioControlsProps> = ({ audioRef }) => {
   const [speakerOn, setSpeakerOn] = useState(true);
   const [audioEnabled, setAudioEnabled] = useState(!isMobileDevice()); // На mobile по умолчанию выключен, на desktop включен
+  const [microphoneMuted, setMicrophoneMuted] = useState(false);
   const mobile = isMobileDevice();
+  const dispatch = useDispatch();
 
   useEffect(() => {
     if (audioRef.current) {
@@ -48,7 +53,7 @@ export const CallAudioControls: React.FC<CallAudioControlsProps> = ({ audioRef }
     const newAudioEnabled = !audioEnabled;
     console.log(`[CallAudioControls] Toggling microphone: ${audioEnabled} -> ${newAudioEnabled}`);
     setAudioEnabled(newAudioEnabled);
-    
+
     // Не устанавливаем muted здесь - пусть useEffect это делает синхронно
     // Но пытаемся включить звук при включении
     if (newAudioEnabled && audioRef.current) {
@@ -56,6 +61,17 @@ export const CallAudioControls: React.FC<CallAudioControlsProps> = ({ audioRef }
       audioRef.current.play().catch(err => {
         console.warn('Failed to play audio on microphone toggle:', err);
       });
+    }
+  };
+
+  const handleMicrophoneMuteToggle = () => {
+    const sipService = getSipServiceInstance();
+    if (sipService) {
+      const newMutedState = sipService.toggleMute();
+      console.log(`[CallAudioControls] Toggling microphone mute, new state: ${newMutedState}`);
+      setMicrophoneMuted(newMutedState);
+    } else {
+      console.warn('[CallAudioControls] SipService not available for toggleMute');
     }
   };
 
@@ -80,7 +96,7 @@ export const CallAudioControls: React.FC<CallAudioControlsProps> = ({ audioRef }
 
   return (
     <div className={cls.container}>
-      {/* Иконка микрофона */}
+      {/* Иконка вывода звука */}
       <button
         onClick={handleMicrophoneToggle}
         className={cls.microphoneButton}
@@ -88,7 +104,7 @@ export const CallAudioControls: React.FC<CallAudioControlsProps> = ({ audioRef }
         aria-label={audioEnabled ? 'Выключить звук' : 'Включить звук'}
       >
         <span className={cls.microphoneIcon} role="img" aria-hidden="true">
-          🎙️
+          🔊
         </span>
         {!audioEnabled && (
           <span className={cls.microphoneDisabled}>
@@ -97,15 +113,32 @@ export const CallAudioControls: React.FC<CallAudioControlsProps> = ({ audioRef }
         )}
       </button>
 
+      {/* Иконка микрофона (mute/unmute) */}
+      <button
+        onClick={handleMicrophoneMuteToggle}
+        className={cls.microphoneButton}
+        title={microphoneMuted ? 'Микрофон выключен. Нажми, чтобы включить.' : 'Микрофон включен. Нажми, чтобы выключить.'}
+        aria-label={microphoneMuted ? 'Включить микрофон' : 'Выключить микрофон'}
+      >
+        <span className={cls.microphoneIcon} role="img" aria-hidden="true">
+          🎙️
+        </span>
+        {microphoneMuted && (
+          <span className={cls.microphoneDisabled}>
+            <span className={cls.microphoneDisabledLine}></span>
+          </span>
+        )}
+      </button>
+
       {/* Кнопка переключения громкой связи (только когда звук включен) */}
-      {audioEnabled && mobile && (
+      {/* {audioEnabled && mobile && (
         <button
           onClick={handleSpeakerToggle}
           className={cls.speakerButton}
         >
           {speakerOn ? '🔊 Громкая связь' : '🦻 В наушник'}
         </button>
-      )}
+      )} */}
     </div>
   );
 };

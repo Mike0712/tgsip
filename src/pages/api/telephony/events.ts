@@ -131,6 +131,18 @@ const eventsHandler = async (req: AuthenticatedRequest, res: NextApiResponse) =>
           status: 'left',
           metadata: payload.metadata,
         });
+
+        await sseClient(`/pushEvent`, {
+          method: 'POST',
+          body: JSON.stringify({
+            event: 'participant_left',
+            event_id: session.bridge_id,
+            payload: {
+              userId: userAccount?.user_id,
+            },
+          }),
+        });
+
         break;
       }
 

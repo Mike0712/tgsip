@@ -20,6 +20,7 @@ interface SipState {
   invite: boolean;
   answer: boolean;
   hangup: boolean;
+  toggleMute: boolean;
   sipAccounts: SipAccount[];
   selectedAccount: SipAccount | null;
   userPhones: UserPhone[];
@@ -51,6 +52,7 @@ const initialState: SipState = {
   invite: false,
   answer: false,
   hangup: false,
+  toggleMute: false,
   sipAccounts: [],
   selectedAccount: null,
   userPhones: [],
@@ -101,6 +103,9 @@ const sipSlice = createSlice({
     },
     setHangup: (state, action: PayloadAction<boolean>) => {
       state.hangup = action.payload;
+    },
+    setToggleMute: (state, action: PayloadAction<boolean>) => {
+      state.toggleMute = action.payload;
     },
     setUnhangup: (state) => {
       state.hangup = false;
@@ -190,6 +195,7 @@ export const {
   setInvite, 
   setAnswer, 
   setHangup,
+  setToggleMute,
   setSipAccounts,
   setSelectedAccount,
   setUserPhones,
