@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 
-interface InitData {
+interface InitDataUnsafe {
   user?: {
     id: number;
     first_name: string;
@@ -20,11 +20,11 @@ export const useRegistration = (): UseRegistrationReturn => {
   const register = useCallback(async (first_name: string): Promise<{ success: boolean; token?: string; error?: string }> => {
     setIsLoading(true);
     try {
-      let initData: InitData | undefined;
+      let initDataUnsafe: InitDataUnsafe | undefined;
       
       // В production режиме используем Telegram Web App
-      if (typeof window !== 'undefined' && window.Telegram?.WebApp?.initData) {
-        initData = window.Telegram.WebApp.initData;
+      if (typeof window !== 'undefined' && window.Telegram?.WebApp?.initDataUnsafe) {
+        initDataUnsafe = window.Telegram.WebApp.initDataUnsafe;
       }
       
       // В dev режиме получаем данные из URL параметров или body
@@ -35,7 +35,7 @@ export const useRegistration = (): UseRegistrationReturn => {
           try {
             const decodedParam = decodeURIComponent(userParam);
             const userData = JSON.parse(decodedParam);
-            initData = { user: userData };
+            initDataUnsafe = { user: userData };
           } catch (parseError) {
             console.error('❌ Failed to parse user param:', parseError);
             return { success: false, error: 'Failed to parse Telegram user data' };
@@ -43,7 +43,7 @@ export const useRegistration = (): UseRegistrationReturn => {
         }
       }
 
-      if (!initData?.user) {
+      if (!initDataUnsafe?.user) {
         return { success: false, error: 'No Telegram user data available' };
       }
 
@@ -55,7 +55,7 @@ export const useRegistration = (): UseRegistrationReturn => {
         body.initData = window.Telegram.WebApp.initData;
       } else if (process.env.NODE_ENV === 'development') {
         // В dev режиме передаем user
-        body.user = initData.user;
+        body.user = initDataUnsafe.user;
       }
 
       const res = await fetch('/api/auth/register', {
