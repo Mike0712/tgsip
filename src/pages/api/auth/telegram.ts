@@ -114,19 +114,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         hash: hash ? 'present' : 'missing'
       });
       
-      const isValid = validateTelegramData({ ...params, hash }, botToken);
+      const isValid = validateTelegramData(initData, botToken);
       if (!isValid) {
-        console.error('❌ Telegram signature validation failed', {
+        logger.error({
+          message: '❌ Telegram signature validation failed',
           dataKeys: Object.keys(params),
           hash,
           hasBotToken: !!botToken
         });
         // return res.status(401).json({ error: 'Invalid Telegram data signature' });
       } else {
-        console.log('✅ Telegram signature valid');
+        logger.info('✅ Telegram signature valid');
       }
     } else if (!isDev && !botToken) {
-      console.error('❌ Production mode but TELEGRAM_BOT_TOKEN is missing');
+      logger.error('❌ Production mode but TELEGRAM_BOT_TOKEN is missing');
       return res.status(500).json({ error: 'Server configuration error' });
     }
 
