@@ -102,10 +102,10 @@ export function validateTelegramData(
     .map((k) => `${k}=${params.get(k) ?? ""}`)
     .join("\n");
 
-  const secretKey = crypto
+  const secretKey = new Uint8Array(crypto
     .createHmac("sha256", "WebAppData")
     .update(botToken)
-    .digest("base64");
+    .digest());
 
   const computedHash = crypto
     .createHmac("sha256", secretKey)
