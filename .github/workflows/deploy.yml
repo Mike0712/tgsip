@@ -29,16 +29,21 @@ jobs:
 
       - name: 🔨 Build project (verify)
         if: steps.changes.outputs.nextjs == 'true'
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          port: ${{ secrets.SSH_PORT || 22 }}
-          script: |
-            cd ${{ secrets.PROJECT_DIR }}
-            docker compose -f docker-compose.ci.yml build tgsip
-            docker image prune -f
-            docker compose up -d --no-deps tgsip
-
-            echo "✅ Project build and deployment completed successfully!"
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p ${{ secrets.SSH_PORT || 22 }} -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+          
+          ssh -i ~/.ssh/deploy_key \
+              -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=~/.ssh/known_hosts \
+              -p ${{ secrets.SSH_PORT || 22 }} \
+              ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+              "cd ${{ secrets.PROJECT_DIR }} && \
+               docker compose -f docker-compose.ci.yml build tgsip && \
+               docker image prune -f && \
+               docker compose up -d --no-deps tgsip && \
+               echo '✅ Project build and deployment completed successfully!'"
+          
+          rm -f ~/.ssh/deploy_key
