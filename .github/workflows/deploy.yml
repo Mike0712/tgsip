@@ -52,6 +52,11 @@ jobs:
               echo "⚠️  Code is already up to date"
             fi
             cd ${{ secrets.PROJECT_DIR }}
+            # Включаем BuildKit для ускорения сборки
+            export DOCKER_BUILDKIT=1
+            export COMPOSE_DOCKER_CLI_BUILD=1
+            # Проверяем что BuildKit доступен
+            docker buildx version || echo "⚠️  BuildKit not available, using standard build"
             # Пересобираем образ с обновлением базового образа
             docker compose -f docker-compose.ci.yml build --pull tgsip
             docker image prune -f
