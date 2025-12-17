@@ -55,10 +55,8 @@ jobs:
             # Включаем BuildKit для ускорения сборки
             export DOCKER_BUILDKIT=1
             export COMPOSE_DOCKER_CLI_BUILD=1
-            # Проверяем что BuildKit доступен
-            docker buildx version || echo "⚠️  BuildKit not available, using standard build"
-            # Пересобираем образ с обновлением базового образа
-            docker compose -f docker-compose.ci.yml build --pull tgsip
+            # Пересобираем образ (без --pull для ускорения, базовый образ обновляется редко)
+            docker compose -f docker-compose.ci.yml build tgsip
             docker image prune -f
             # Пересоздаем и перезапускаем контейнер
             docker compose -f docker-compose.ci.yml up -d --force-recreate --no-deps tgsip
