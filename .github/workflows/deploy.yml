@@ -1,0 +1,44 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-22.04.3
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🔄 Check changes
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            nextjs:
+              - 'src/**'
+
+      - name: 🔨 Build project (verify)
+        if: steps.changes.outputs.nextjs == 'true'
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          script: |
+            cd ${{ secrets.PROJECT_DIR }}
+            docker compose docker compose -f docker-compose.ci.yml build tgsip
+            docker image prune -f
+            docker compose up -d --no-deps tgsip
+
+            echo "✅ Project build and deployment completed successfully!"
