@@ -38,7 +38,11 @@ jobs:
           port: ${{ secrets.SSH_PORT || 22 }}
           script: |
             cd ${{ secrets.PROJECT_DIR }}
-            docker compose -f docker-compose.ci.yml build tgsip
+            # Обновляем код из репозитория (без удаления локальных файлов)
+            git pull origin master
+            # Пересобираем образ с обновлением базового образа
+            docker compose -f docker-compose.ci.yml build --pull --no-cache tgsip
             docker image prune -f
-            docker compose up -d --no-deps tgsip
+            # Пересоздаем и перезапускаем контейнер
+            docker compose -f docker-compose.ci.yml up -d --force-recreate --no-deps tgsip
             echo "✅ Project build and deployment completed successfully!"
