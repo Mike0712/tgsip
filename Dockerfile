@@ -6,6 +6,14 @@ RUN npm ci --prefer-offline --no-audit
 
 FROM node:20-slim AS builder
 WORKDIR /app
+# ARG для переменных, которые нужны во время сборки
+ARG NEXT_PUBLIC_SSE_SERVER_URL
+ARG NEXT_PUBLIC_TELEGRAM_BOT_USERNAME
+ARG NEXT_PUBLIC_APP_URL
+# Преобразуем ARG в ENV для использования в npm run build
+ENV NEXT_PUBLIC_SSE_SERVER_URL=${NEXT_PUBLIC_SSE_SERVER_URL}
+ENV NEXT_PUBLIC_TELEGRAM_BOT_USERNAME=${NEXT_PUBLIC_TELEGRAM_BOT_USERNAME}
+ENV NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build
@@ -20,6 +28,7 @@ RUN apt-get update && \
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/next.config.mjs ./next.config.mjs
+COPY --from=builder /app/public ./public
 # Копируем только production node_modules (быстрее чем переустановка)
 COPY --from=builder /app/node_modules ./node_modules
 EXPOSE 3000
