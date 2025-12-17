@@ -37,9 +37,21 @@ jobs:
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
           port: ${{ secrets.SSH_PORT || 22 }}
           script: |
+            cd ${{ secrets.PROJECT_DIR }}/tgsip
+            # Обновляем код из репозитория
+            OLD_COMMIT=$(git rev-parse HEAD)
+            git fetch origin
+            # Пытаемся обновить, сохраняя локальные изменения если нужно
+            git pull --rebase --autostash origin master || git pull origin master || (git stash && git pull origin master && git stash pop)
+            NEW_COMMIT=$(git rev-parse HEAD)
+            echo "📦 Old commit: $OLD_COMMIT"
+            echo "📦 New commit: $NEW_COMMIT"
+            if [ "$OLD_COMMIT" != "$NEW_COMMIT" ]; then
+              echo "✅ Code updated from $OLD_COMMIT to $NEW_COMMIT"
+            else
+              echo "⚠️  Code is already up to date"
+            fi
             cd ${{ secrets.PROJECT_DIR }}
-            # Обновляем код из репозитория (без удаления локальных файлов)
-            git pull origin master
             # Пересобираем образ с обновлением базового образа
             docker compose -f docker-compose.ci.yml build --pull --no-cache tgsip
             docker image prune -f
