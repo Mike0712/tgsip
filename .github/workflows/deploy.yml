@@ -37,7 +37,7 @@ jobs:
           port: ${{ secrets.SSH_PORT || 22 }}
           script: |
             cd ${{ secrets.PROJECT_DIR }}
-            docker compose docker compose -f docker-compose.ci.yml build tgsip
+            docker compose -f docker-compose.ci.yml build tgsip
             docker image prune -f
             docker compose up -d --no-deps tgsip
 
