@@ -124,7 +124,7 @@ const MiniPhoneScreen: React.FC = () => {
           {controller.user && (
             <>
             <p className="text-xs text-gray-500 text-center -mt-4 mb-4">{controller.user.username ? `@${controller.user.username}` : controller.user.first_name}</p>
-            <p className="text-xs text-green-600 text-center -mt-3 mb-4">✅ Аутентифицирован</p>
+            <p className="text-xs text-green-600 text-center -mt-3 mb-4">✅ Подтвержден</p>
             </>
           )}
 

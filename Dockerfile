@@ -1,9 +1,8 @@
 FROM node:20-slim AS deps
 WORKDIR /app
 COPY package*.json ./
-# Кешируем npm пакеты для ускорения последующих сборок
-RUN --mount=type=cache,target=/root/.npm \
-    npm ci --prefer-offline --no-audit
+# Устанавливаем зависимости (кеш npm работает автоматически через BuildKit)
+RUN npm ci --prefer-offline --no-audit
 
 FROM node:20-slim AS builder
 WORKDIR /app
