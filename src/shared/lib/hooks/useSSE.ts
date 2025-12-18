@@ -8,7 +8,12 @@ export function getSSE(user_id: string) {
 
   // 1. Singleton EventSource map
   if (!sources[user_id]) {
-    const url = `${process.env.NEXT_PUBLIC_SSE_SERVER_URL}/events?user_id=${encodeURIComponent(user_id)}`;
+    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+    if (!token) {
+      console.error('[SSE] No auth token found');
+      return null;
+    }
+    const url = `${process.env.NEXT_PUBLIC_SSE_SERVER_URL}/events?token=${encodeURIComponent(token)}`;
     sources[user_id] = new EventSource(url);
     listeners[user_id] = {};
   }
@@ -36,17 +41,33 @@ export function useSSE(user_id: string) {
 
   // subscribe/unsubscribe на событие у сервера
   async function subscribe(event: string, event_id: string) {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+    if (!token) {
+      console.error('[SSE] No auth token found for subscribe');
+      return;
+    }
     await fetch(`${process.env.NEXT_PUBLIC_SSE_SERVER_URL}/subscribe`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user_id, event, event_id }),
+      headers: { 
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify({ event, event_id }),
     });
   }
   async function unsubscribe(event: string, event_id: string) {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+    if (!token) {
+      console.error('[SSE] No auth token found for unsubscribe');
+      return;
+    }
     await fetch(`${process.env.NEXT_PUBLIC_SSE_SERVER_URL}/unsubscribe`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user_id, event, event_id }),
+      headers: { 
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify({ event, event_id }),
     });
   }
 
