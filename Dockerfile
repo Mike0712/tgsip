@@ -16,6 +16,12 @@ ENV NEXT_PUBLIC_TELEGRAM_BOT_USERNAME=${NEXT_PUBLIC_TELEGRAM_BOT_USERNAME}
 ENV NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+# Отладочная информация - проверяем что переменные доступны перед сборкой
+RUN echo "🔍 Checking env vars before build:" && \
+    echo "NEXT_PUBLIC_SSE_SERVER_URL=${NEXT_PUBLIC_SSE_SERVER_URL}" && \
+    echo "NEXT_PUBLIC_TELEGRAM_BOT_USERNAME=${NEXT_PUBLIC_TELEGRAM_BOT_USERNAME}" && \
+    echo "NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}" && \
+    env | grep NEXT_PUBLIC || echo "⚠️ No NEXT_PUBLIC vars found!"
 RUN npm run build
 
 FROM node:20-slim AS runner
