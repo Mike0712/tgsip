@@ -6,9 +6,11 @@ import { XIcon } from '@heroicons/react/solid';
 import { useDispatch } from 'react-redux';
 import { setHangup } from '@/entities/WebRtc/model/slice';
 import PhoneHandsetHangupIcon from '@/shared/ui/icons/hangup';
+import { DeepLinkShare } from '@/features/DeepLinkShare/ui/deep-link-share';
 
 interface BridgeParticipantsListProps {
   participants: BridgeParticipant[];
+  deepLink: string;
   onHangup?: () => void;
   showVolume?: boolean;
   onVolume?: () => void;
@@ -35,7 +37,7 @@ const VolumeButton: React.FC<{ onVolume?: () => void }> = ({ onVolume }) => (
   </div>
 );
 
-export const BridgeParticipantsList: React.FC<BridgeParticipantsListProps> = ({ participants, showVolume, onVolume, onHangup }) => {
+export const BridgeParticipantsList: React.FC<BridgeParticipantsListProps> = ({ participants, deepLink, showVolume, onVolume, onHangup }) => {
   const [users, setUsers] = useState<Map<number, UserSummary>>(new Map());
   const dispatch = useDispatch();
   const mobile = isMobileDevice();
@@ -127,6 +129,7 @@ export const BridgeParticipantsList: React.FC<BridgeParticipantsListProps> = ({ 
           </div>
         ))}
       </div>
+      <DeepLinkShare deepLink={deepLink} />
       {/* Hangup button — отдельно, реагирует на onHangup если он передан */}
       <div className="flex justify-center mt-8">
         <button
