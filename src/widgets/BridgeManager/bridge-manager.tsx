@@ -354,7 +354,7 @@ const BridgeManager: React.FC = () => {
           {bridgeParticipants.length > 0 && isUserInCall && (
             <>
               <CallAudioControls audioRef={audioRef} />
-              <BridgeParticipantsList participants={bridgeParticipants} onHangup={handleHangup} deepLink={deepLink} />
+              <BridgeParticipantsList participants={bridgeParticipants} onHangup={handleHangup} deepLink={deepLink || ''} />
             </>
           )}
         </>
