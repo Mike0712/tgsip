@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { useAlert } from '@/shared/lib/hooks/useAlert';
+import { DeepLinkShare } from '@/features/DeepLinkShare/ui/deep-link-share';
 
 interface BridgeShareBlockProps {
   deepLink: string | null;
@@ -26,27 +27,7 @@ export const BridgeShareBlock: React.FC<BridgeShareBlockProps> = ({ deepLink, ap
 
   return (
     <>
-      {deepLink && (
-        <div className="mb-3">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Ссылка для Telegram:
-          </label>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              readOnly
-              value={deepLink}
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm"
-            />
-            <button
-              onClick={() => handleCopy(deepLink, 'Deep link скопирован в буфер обмена')}
-              className="px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 text-sm"
-            >
-              Копировать
-            </button>
-          </div>
-        </div>
-      )}
+      {deepLink && <DeepLinkShare deepLink={deepLink} />}
 
       {appLink && process.env.NODE_ENV !== 'production' && (
         <div className="mb-3">
