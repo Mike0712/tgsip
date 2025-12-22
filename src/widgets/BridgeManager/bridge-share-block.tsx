@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { useAlert } from '@/shared/lib/hooks/useAlert';
+import { useAlert } from '@/shared/hooks/useAlert';
 import { DeepLinkShare } from '@/features/DeepLinkShare/ui/deep-link-share';
 
 interface BridgeShareBlockProps {

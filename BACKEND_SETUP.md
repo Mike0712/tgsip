@@ -135,7 +135,7 @@ src/
 ### В React компонентах
 
 ```typescript
-import { useAuth } from '@/shared/lib/hooks/useAuth';
+import { useAuth } from '@/shared/hooks/useAuth';
 
 function MyComponent() {
   const { user, isAuthenticated, loginWithTelegram, logout } = useAuth();

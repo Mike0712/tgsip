@@ -4,8 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState, AppDispatch } from '@/app/store';
-import { useAuth } from '@/shared/lib/hooks/useAuth';
-import { useSSE } from '@/shared/lib/hooks/useSSE';
+import { useAuth } from '@/shared/hooks/useAuth';
+import { useSSE } from '@/shared/hooks/useSSE';
 import { apiClient, SipAccount, UserPhone } from '@/lib/api';
 import { useInviteJoin } from '@/features/InviteJoin/model/useInviteJoin';
 import {
@@ -39,7 +39,7 @@ export const useMiniPhoneController = (): UseMiniPhoneControllerResult => {
   const searchParams = useSearchParams();
 
   const { user, isAuthenticated, isLoading, loginWithTelegram } = useAuth();
-  useSSE(user?.id ? user.id.toString() : "");
+  const { eventSource } = useSSE(user?.id ? user.id.toString() : "");
 
   const [isClient, setIsClient] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -198,7 +198,7 @@ export const useMiniPhoneController = (): UseMiniPhoneControllerResult => {
     }
   }, [isAuthenticated]);
 
-  useEffect(() => {
+  eventSource?.addEventListener('open', () => {
     const loadUserData = async () => {
       if (!isAuthenticated) return;
 
@@ -238,7 +238,7 @@ export const useMiniPhoneController = (): UseMiniPhoneControllerResult => {
     };
 
     loadUserData();
-  }, [isAuthenticated, dispatch]);
+  }, { once: true });
 
   const handleRegistrationSuccess = useCallback(async (token: string) => {
     localStorage.setItem('auth_token', token);

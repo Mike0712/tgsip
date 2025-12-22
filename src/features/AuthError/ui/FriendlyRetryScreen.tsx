@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useRegistrationRequest } from '@/features/RegistrationRequest/model/useRegistrationRequest';
 import { useRegistration } from '@/features/Registration/model/useRegistration';
-import { useAlert } from '@/shared/lib/hooks/useAlert';
+import { useAlert } from '@/shared/hooks/useAlert';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/shared/ui/Alert/alert';
 
 interface FriendlyRetryScreenProps {
