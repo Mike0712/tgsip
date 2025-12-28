@@ -1,6 +1,18 @@
-import { UserAgent, UserAgentOptions, Registerer, RegistererState, Inviter, Invitation, URI, Session, SessionState } from 'sip.js';
+import { 
+  UserAgent, 
+  UserAgentOptions, 
+  Registerer, 
+  RegistererState, 
+  Inviter, 
+  Invitation, 
+  URI, 
+  Session, 
+  SessionState,
+  InviterInviteOptions
+} from 'sip.js';
 import store, { RootState } from '@/app/store';
 import { setStatus, setInvite, setAnswer, setHangup } from '../model/slice';
+import { IncomingResponse } from 'sip.js/lib/core';
 
 class SipService {
   private userAgent: UserAgent | null = null;
@@ -122,23 +134,64 @@ class SipService {
             this.listenSessionState(state);
             listener(state);
           });
-          this.session.invite();
+          
+          const requestDelegate = {
+            onTrying: (response: IncomingResponse) => {
+              listener('Trying');
+            },
+            onProgress: (response: IncomingResponse) => {
+              const statusCode = response.message.statusCode;
+              const reasonPhrase = response.message.reasonPhrase;
+              
+              if (statusCode === 180) {
+                listener('Ringing');
+              } else if (statusCode === 183) {
+                listener('Progress');
+              } else {
+                listener(`Progress-${statusCode}`);
+              }
+            },
+            onAccept: (response: IncomingResponse) => {
+              listener('Accepted');
+            },
+            onReject: (response: IncomingResponse) => {
+              const statusCode = response.message?.statusCode || 0;
+              const reasonPhrase = response.message?.reasonPhrase;
+              
+              if (statusCode === 486) {
+                listener('Busy');
+              } else if (statusCode === 408) {
+                listener('Timeout');
+              } else if (statusCode === 480) {
+                listener('Unavailable');
+              } else if (statusCode === 503) {
+                listener('Congestion');
+              } else if (statusCode >= 500 && statusCode < 600) {
+                listener('ServerError');
+              } else if (statusCode >= 400 && statusCode < 500) {
+                listener(`Rejected-${statusCode}`);
+              } else {
+                listener(`Error-${statusCode}`);
+              }
+            }
+          };
+          
+          const inviteOptions: InviterInviteOptions = {
+            requestDelegate
+          };
+          
+          this.session.invite(inviteOptions);
           if (this.turnServer) {
              const pc = (this.session.sessionDescriptionHandler as unknown as { peerConnection: RTCPeerConnection }).peerConnection;
              let relayFound = false;
-              // 1) Слушаем появление кандидатов
               pc.onicecandidate = (e) => {
                 if (e.candidate && e.candidate.candidate.includes("typ relay")) {
                   relayFound = true;
-                  console.log("TURN relay candidate detected");
                 }
               };
 
-              // 2) Слушаем завершение ICE-gathering
               pc.onicegatheringstatechange = () => {
                 if (pc.iceGatheringState === "complete") {
-                  console.log("ICE gathering completed");
-
                   if (!relayFound) {
                     console.error("TURN relay not found — aborting call");
                     (this.session as Session).bye();
@@ -148,8 +201,6 @@ class SipService {
 
               // 3) Дополнительно можно слушать ICE connection events
               pc.oniceconnectionstatechange = () => {
-                console.log("ICE state:", pc.iceConnectionState);
-
                 if (pc.iceConnectionState === "failed") {
                   console.error("ICE failed — likely TURN issue");
                   (this.session as Session).bye();
@@ -167,11 +218,9 @@ class SipService {
     const target = UserAgent.makeURI(`sip:${ sipUsername } @${ this.host } `);
     
     try {
-      // Запрашиваем микрофон ДО звонка (критично для мобильных)
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
         console.log('🎤 Microphone access granted');
-        // Останавливаем стрим, SIP.js создаст свой
         stream.getTracks().forEach(track => track.stop());
       } catch (micError) {
         console.error('❌ Microphone access denied:', micError);
@@ -190,8 +239,53 @@ class SipService {
             this.listenSessionState(state);
             listener(state);
           });
-          console.log(`📞 Calling SIP account: ${ sipUsername } `);
-          this.session.invite();
+          
+          const requestDelegate = {
+            onTrying: (response: IncomingResponse) => {
+              listener('Trying');
+            },
+            onProgress: (response: IncomingResponse) => {
+              const statusCode = response.message.statusCode;
+              const reasonPhrase = response.message.reasonPhrase;
+              
+              if (statusCode === 180) {
+                listener('Ringing');
+              } else if (statusCode === 183) {
+                listener('Progress');
+              } else {
+                listener(`Progress-${statusCode}`);
+              }
+            },
+            onAccept: (response: IncomingResponse) => {
+              listener('Accepted');
+            },
+            onReject: (response: IncomingResponse) => { // IncomingResponse
+              const statusCode = response.message?.statusCode || 0;
+              const reasonPhrase = response.message?.reasonPhrase || '';
+              
+              if (statusCode === 486) {
+                listener('Busy');
+              } else if (statusCode === 408) {
+                listener('Timeout');
+              } else if (statusCode === 480) {
+                listener('Unavailable');
+              } else if (statusCode === 503) {
+                listener('Congestion');
+              } else if (statusCode >= 500 && statusCode < 600) {
+                listener('ServerError');
+              } else if (statusCode >= 400 && statusCode < 500) {
+                listener(`Rejected-${statusCode}`);
+              } else {
+                listener(`Error-${statusCode}`);
+              }
+            }
+          };
+          
+          const inviteOptions: InviterInviteOptions = {
+            requestDelegate
+          };
+          
+          this.session.invite(inviteOptions);
         }
       }
     } catch ($e) {
@@ -225,7 +319,6 @@ class SipService {
       };
 
       this.session.sessionDescriptionHandler?.sendDtmf(tone, dtmfOptions);
-      console.log('📞 DTMF sent:', tone);
     } else {
       console.warn('⚠️ No active session to send DTMF');
     }
@@ -237,15 +330,13 @@ class SipService {
       return false;
     }
 
-    const peerConnection = (this.session.sessionDescriptionHandler as any)?.peerConnection;
+    const peerConnection = (this.session.sessionDescriptionHandler as unknown as { peerConnection: RTCPeerConnection })?.peerConnection;
     if (!peerConnection) {
       console.warn('⚠️ No peer connection for toggleMute');
       return false;
     }
 
-    // Получаем все local audio tracks через senders
     const senders = peerConnection.getSenders();
-    console.log(`[toggleMute] Found ${senders.length} senders`);
     
     let currentMutedState: boolean | null = null;
     let hasAudioTracks = false;
@@ -254,16 +345,12 @@ class SipService {
     for (const sender of senders) {
       if (sender.track && sender.track.kind === 'audio') {
         hasAudioTracks = true;
-        // Определяем текущее состояние по первому треку (muted = !enabled)
         if (currentMutedState === null) {
           currentMutedState = !sender.track.enabled;
-          newMutedState = !currentMutedState; // Переключаем состояние
-          console.log(`[toggleMute] Current muted state: ${currentMutedState}, switching to: ${newMutedState}`);
+          newMutedState = !currentMutedState;
         }
-        // Переключаем: устанавливаем enabled в противоположное значение
         const oldEnabled = sender.track.enabled;
-        sender.track.enabled = newMutedState ? false : true; // enabled = !muted
-        console.log(`🔇 Local audio track ${oldEnabled ? 'enabled' : 'disabled'} -> ${sender.track.enabled ? 'enabled' : 'disabled'}`);
+        sender.track.enabled = newMutedState ? false : true;
       }
     }
 
@@ -286,7 +373,7 @@ class SipService {
       mediaElement.addEventListener('volumechange', console.log);
       mediaElement.addEventListener('ended', console.log);
       if (this.session instanceof Session) {
-        const peerConnection = (this.session.sessionDescriptionHandler as any)?.peerConnection;
+        const peerConnection = (this.session.sessionDescriptionHandler as unknown as { peerConnection: RTCPeerConnection })?.peerConnection;
         if (peerConnection) {
           for (const receiver of peerConnection.getReceivers()) {
             if (receiver.track) {
