@@ -186,16 +186,14 @@ const BridgeManager: React.FC = () => {
   // --- ЧИСТАЯ ПОДПИСКА НА SSE ---
   useEffect(() => {
     if (!user?.id || !bridgeSession?.id) return;
-    subscribe('participant_joined', bridgeSession.id);
-    subscribe('participant_left', bridgeSession.id);
+    subscribe(['participant_joined', 'participant_left'], bridgeSession.id);
     const handler = (data: any) => {
       refreshSession();
     };
     on('participant_joined', handler);
     on('participant_left', handler);
     return () => {
-      unsubscribe('participant_joined', bridgeSession.id);
-      unsubscribe('participant_left', bridgeSession.id);
+      unsubscribe(['participant_joined', 'participant_left'], bridgeSession.id);
       off('participant_joined', handler);
       off('participant_left', handler);
     };

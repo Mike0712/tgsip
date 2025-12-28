@@ -5,26 +5,34 @@ const listeners: Record<string, Record<string, Set<Handler>>> = {};
 
 export function getSSE(user_id: string) {
   if (!user_id) return null;
-
-  // 1. Singleton EventSource map
   if (!sources[user_id]) {
     const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
     if (!token) {
       console.error('[SSE] No auth token found');
       return null;
     }
-    const url = `${process.env.NEXT_PUBLIC_SSE_SERVER_URL}/events?token=${encodeURIComponent(token)}`;
-    sources[user_id] = new EventSource(url);
-    listeners[user_id] = {};
+    
+    const sseServerUrl = process.env.NEXT_PUBLIC_SSE_SERVER_URL;
+    if (!sseServerUrl) {
+      console.error('[SSE] NEXT_PUBLIC_SSE_SERVER_URL is not configured');
+      return null;
+    }
+    
+    const url = `${sseServerUrl}/events?token=${encodeURIComponent(token)}`;
+    try {
+      sources[user_id] = new EventSource(url);
+      listeners[user_id] = {};
+    } catch (error) {
+      console.error('[SSE] Failed to create EventSource:', error);
+      return null;
+    }
   }
   return sources[user_id];
 }
 
 export function useSSE(user_id: string) {
   const es = getSSE(user_id);
-  // API ниже НЕ useEffect-хук! Можно дергать из любого места
 
-  // subscribe: добавляет слушателя к своему user_id/source
   function on(event: string, handler: Handler) {
     if (!es) return;
     if (!listeners[user_id][event]) listeners[user_id][event] = new Set();
@@ -32,43 +40,85 @@ export function useSSE(user_id: string) {
     es.addEventListener(event, handler);
   }
 
-  // unsubscribe: удаляет слушателя
   function off(event: string, handler: Handler) {
     if (!es) return;
     listeners[user_id][event]?.delete(handler);
     es.removeEventListener(event, handler);
   }
 
-  // subscribe/unsubscribe на событие у сервера
-  async function subscribe(event: string, event_id: string) {
+  async function subscribe(event: string | string[], event_id: string) {
     const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
     if (!token) {
       console.error('[SSE] No auth token found for subscribe');
       return;
     }
-    await fetch(`${process.env.NEXT_PUBLIC_SSE_SERVER_URL}/subscribe`, {
-      method: "POST",
-      headers: { 
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`
-      },
-      body: JSON.stringify({ event, event_id }),
-    });
+
+    const sseServerUrl = process.env.NEXT_PUBLIC_SSE_SERVER_URL;
+    if (!sseServerUrl) {
+      console.error('[SSE] NEXT_PUBLIC_SSE_SERVER_URL is not configured');
+      return;
+    }
+
+    try {
+      const response = await fetch(`${sseServerUrl}/subscribe`, {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ event, event_id }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => 'Unknown error');
+        console.error(`[SSE] Subscribe failed: ${response.status} ${response.statusText}`, errorText);
+        return;
+      }
+
+      console.log(`[SSE] Successfully subscribed to event: ${event}, event_id: ${event_id}`);
+    } catch (error) {
+      console.error('[SSE] Subscribe request failed:', error);
+      if (error instanceof TypeError && error.message === 'Failed to fetch') {
+        console.error(`[SSE] Cannot connect to SSE server at ${sseServerUrl}. Check if server is running and CORS is configured.`);
+      }
+    }
   }
-  async function unsubscribe(event: string, event_id: string) {
+  async function unsubscribe(event: string | string[], event_id: string) {
     const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
     if (!token) {
       console.error('[SSE] No auth token found for unsubscribe');
       return;
     }
-    await fetch(`${process.env.NEXT_PUBLIC_SSE_SERVER_URL}/unsubscribe`, {
-      method: "POST",
-      headers: { 
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`
-      },
-      body: JSON.stringify({ event, event_id }),
-    });
+
+    const sseServerUrl = process.env.NEXT_PUBLIC_SSE_SERVER_URL;
+    if (!sseServerUrl) {
+      console.error('[SSE] NEXT_PUBLIC_SSE_SERVER_URL is not configured');
+      return;
+    }
+
+    try {
+      const response = await fetch(`${sseServerUrl}/unsubscribe`, {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ event, event_id }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => 'Unknown error');
+        console.error(`[SSE] Unsubscribe failed: ${response.status} ${response.statusText}`, errorText);
+        return;
+      }
+
+      console.log(`[SSE] Successfully unsubscribed from event: ${event}, event_id: ${event_id}`);
+    } catch (error) {
+      console.error('[SSE] Unsubscribe request failed:', error);
+      if (error instanceof TypeError && error.message === 'Failed to fetch') {
+        console.error(`[SSE] Cannot connect to SSE server at ${sseServerUrl}. Check if server is running and CORS is configured.`);
+      }
+    }
   }
 
   return { eventSource: es, on, off, subscribe, unsubscribe };
