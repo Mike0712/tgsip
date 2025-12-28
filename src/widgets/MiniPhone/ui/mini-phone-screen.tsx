@@ -4,11 +4,9 @@ import React from 'react';
 import dynamic from 'next/dynamic';
 import { useSelector } from 'react-redux';
 import { RootState } from '@/app/store';
-import { useMiniPhoneController, MiniPhoneView } from '@/features/MiniPhone/model/useMiniPhoneController';
-import AudioButton from '@/shared/ui/AudioButton/audio-button';
-import { AlertProvider } from '@/shared/lib/hooks/useAlert';
+import { useMiniPhoneController, MiniPhoneView } from '@/shared/hooks/useMiniPhoneController';
+import { AlertProvider } from '@/shared/hooks/useAlert';
 import { AlertContainer } from '@/shared/lib/AlertContainer';
-import { AuthErrorScreen } from '@/features/AuthError/ui/AuthErrorScreen';
 import { BridgeManager } from '@/widgets/BridgeManager';
 import FriendlyRetryScreen from '@/features/AuthError/ui/FriendlyRetryScreen';
 

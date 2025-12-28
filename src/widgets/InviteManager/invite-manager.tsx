@@ -12,7 +12,7 @@ import {
   resetInvite
 } from '@/entities/WebRtc/model/slice';
 import { getSipServiceInstance } from '@/entities/WebRtc/services/sipServiceInstance';
-import { useAlert } from '@/shared/lib/hooks/useAlert';
+import { useAlert } from '@/shared/hooks/useAlert';
 
 const InviteManager = () => {
   const dispatch = useDispatch();

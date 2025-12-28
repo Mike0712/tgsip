@@ -1,6 +1,6 @@
 import React from 'react';
 import { Alert } from '@/shared/ui/Alert/alert';
-import { useAlert } from '@/shared/lib/hooks/useAlert';
+import { useAlert } from '@/shared/hooks/useAlert';
 
 export const AlertContainer: React.FC = () => {
   const { alert, hideAlert } = useAlert();
