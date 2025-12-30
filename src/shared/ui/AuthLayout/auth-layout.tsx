@@ -2,7 +2,7 @@ import React, { ReactElement } from 'react';
 import cls from './auth-layout.module.css';
 
 interface AuthLayoutProps {
-  sidebar: ReactElement;
+  sidebar?: ReactElement;
   leftMenu?: ReactElement;
   content: ReactElement;
 }

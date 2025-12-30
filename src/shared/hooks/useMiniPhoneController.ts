@@ -23,7 +23,7 @@ interface UseMiniPhoneControllerResult {
   isAuthenticated: boolean;
   user: ReturnType<typeof useAuth>['user'];
   authError: string | null;
-  handleRetryAuth: () => void;
+  sseReady: boolean;
   handleRegistrationSuccess: (token: string) => Promise<void>;
   callMode: RootState['sip']['callMode'];
   inviteStatus: RootState['sip']['inviteStatus'];
@@ -46,7 +46,7 @@ export const useMiniPhoneController = (): UseMiniPhoneControllerResult => {
   const [attemptedAuth, setAttemptedAuth] = useState(false);
   const [activeView, setActiveViewState] = useState<MiniPhoneView>('general');
   const [viewLocked, setViewLocked] = useState(false);
-
+  const [sseReady, setSseReady] = useState(false);
   const inviteToken = useSelector((state: RootState) => state.sip.inviteToken);
   const callMode = useSelector((state: RootState) => state.sip.callMode);
   const inviteStatus = useSelector((state: RootState) => state.sip.inviteStatus);
@@ -229,6 +229,7 @@ export const useMiniPhoneController = (): UseMiniPhoneControllerResult => {
             : phonesPayload.phones || [];
 
           dispatch(setUserPhones(phones));
+          setSseReady(true);
         } else {
           console.error('Failed to load user phones:', phonesResponse.error);
         }
@@ -256,11 +257,6 @@ export const useMiniPhoneController = (): UseMiniPhoneControllerResult => {
     }
   }, []);
 
-  const handleRetryAuth = useCallback(() => {
-    setAuthError(null);
-    setAttemptedAuth(false);
-  }, []);
-
   const setActiveView = useCallback((view: MiniPhoneView) => {
     setActiveViewState(view);
     setViewLocked(true);
@@ -275,8 +271,8 @@ export const useMiniPhoneController = (): UseMiniPhoneControllerResult => {
       isAuthenticated,
       user,
       authError,
-      handleRetryAuth,
       handleRegistrationSuccess,
+      sseReady,
       callMode,
       inviteStatus,
       activeView,
@@ -289,8 +285,8 @@ export const useMiniPhoneController = (): UseMiniPhoneControllerResult => {
       activeView,
       authError,
       callMode,
+      sseReady,
       handleRegistrationSuccess,
-      handleRetryAuth,
       inviteStatus,
       isAuthenticated,
       isLoading,

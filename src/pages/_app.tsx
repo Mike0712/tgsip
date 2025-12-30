@@ -11,14 +11,14 @@ import LeftMenu from '@/shared/ui/LeftMenu/left-menu';
 const App = ({ Component, pageProps }: AppProps) => {
   const router = useRouter();
   
-  // Страницы без левого меню
   const pagesWithoutLeftMenu = ['/miniphone'];
   const hideLeftMenu = pagesWithoutLeftMenu.includes(router.pathname);
+  const hideSidebar = pagesWithoutLeftMenu.includes(router.pathname);
 
   return (
     <Provider store={store}>
       <AuthLayout 
-        sidebar={<Sidebar />}
+        sidebar={hideSidebar ? undefined : <Sidebar />}
         leftMenu={hideLeftMenu ? undefined : <LeftMenu /> as unknown as React.ReactElement}
         content={<Component {...pageProps} />}
       />
