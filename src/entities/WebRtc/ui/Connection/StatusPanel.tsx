@@ -66,7 +66,6 @@ const StatusPanel = () => {
     }
   }, [toggleMute]);
 
-  // Автовосстановление при переходе из online в offline (только если НЕ в активной сессии)
   useEffect(() => {
     if (!selectedAccount) return;
 
@@ -265,7 +264,7 @@ const StatusPanel = () => {
           </div>
 
           {sessionStatus && (
-            <div className={cls.statusItem}>
+            <div className={cls.statusItemVertical}>
               <span className={cls.statusIcon}>{sessionStatus.icon}</span>
               <div className={cls.statusInfo}>
                 <span className={cls.statusLabel}>Сессия</span>
