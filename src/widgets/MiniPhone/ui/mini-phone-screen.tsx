@@ -115,7 +115,7 @@ const MiniPhoneScreen: React.FC = () => {
             {controller.user && (
               <div className="mt-3 p-3 bg-white rounded-lg shadow-sm flex items-center gap-3">
                 {controller.sseReady && (
-                  <div className="flex-shrink-0">
+                  <div className="flex-shrink-0 max-w-[140px]">
                     <StatusPanel />
                   </div>
                 )}
