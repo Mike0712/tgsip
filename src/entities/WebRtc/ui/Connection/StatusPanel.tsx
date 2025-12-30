@@ -3,7 +3,7 @@ import { useSelector } from 'react-redux';
 import store, { RootState } from "@/app/store";
 import SipService from '../../services/sipService';
 import { setSessionState, setToggleMute } from '@/entities/WebRtc/model/slice';
-import { setSipServiceInstance } from '../../services/sipServiceInstance';
+import { setSipServiceInstance, getSipServiceInstance } from '../../services/sipServiceInstance';
 import { WakeLockManager } from '@/shared/ui/WakeLockManager/wake-lock-manager';
 import cls from './status-panel.module.css';
 
@@ -245,8 +245,46 @@ const StatusPanel = () => {
     }
   };
 
+  const handleReconnect = () => {
+    if (status === 'offline' && selectedAccount && !isReconnecting) {
+      setIsReconnecting(true);
+      
+      const existingService = getSipServiceInstance() || sipService;
+      
+      try {
+        if (existingService) {
+          existingService.initialize();
+        } else if (selectedAccount) {
+          sipService = new SipService(
+            selectedAccount.sip_server,
+            selectedAccount.sip_port,
+            selectedAccount.sip_username,
+            selectedAccount.secret,
+            selectedAccount.turn_server || null
+          );
+          sipService.initialize();
+          setSipServiceInstance(sipService);
+        }
+      } catch (error) {
+        console.error('❌ Failed to reconnect:', error);
+        if (selectedAccount) {
+          sipService = new SipService(
+            selectedAccount.sip_server,
+            selectedAccount.sip_port,
+            selectedAccount.sip_username,
+            selectedAccount.secret,
+            selectedAccount.turn_server || null
+          );
+          sipService.initialize();
+          setSipServiceInstance(sipService);
+        }
+      }
+    }
+  };
+
   const connectionStatus = getConnectionStatus();
   const sessionStatus = getSessionStatus();
+  const isOffline = status === 'offline';
 
   return (
     <>
@@ -254,7 +292,12 @@ const StatusPanel = () => {
       <div className={cls.statusPanel}>
         <div className={cls.statusRow}>
           <div className={cls.statusItem}>
-            <span className={`${cls.statusIndicator} ${connectionStatus.className}`}>
+            <span 
+              className={`${cls.statusIndicator} ${connectionStatus.className} ${isOffline ? cls.clickable : ''}`}
+              onClick={isOffline ? handleReconnect : undefined}
+              title={isOffline ? 'Нажмите для переподключения' : undefined}
+              style={isOffline ? { cursor: 'pointer' } : undefined}
+            >
               {connectionStatus.icon}
             </span>
             <div className={cls.statusInfo}>
