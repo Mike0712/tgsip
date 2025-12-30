@@ -9,6 +9,8 @@ import { AlertProvider } from '@/shared/hooks/useAlert';
 import { AlertContainer } from '@/shared/lib/AlertContainer';
 import { BridgeManager } from '@/widgets/BridgeManager';
 import FriendlyRetryScreen from '@/features/AuthError/ui/FriendlyRetryScreen';
+import StatusPanel from '@/entities/WebRtc/ui/Connection/StatusPanel';
+import MiniLogout from '@/entities/User/ui/Logout/MiniLogout';
 
 const connectingSessionStates = new Set(['Establishing', 'Established']);
 const connectingInviteStates = new Set(['creating', 'waiting', 'connecting', 'ready', 'active']);
@@ -107,26 +109,25 @@ const MiniPhoneScreen: React.FC = () => {
     <AlertProvider>
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
         <div className="max-w-md mx-auto">
-          <div className="text-center mb-6">
+          <div className="text-center mb-2">
             <h1 className="text-2xl font-bold text-gray-800 mb-2">📞 MiniPhone</h1>
 
             {controller.user && (
-              <div className="mt-3 p-3 bg-white rounded-lg shadow-sm">
-                <p className="text-sm font-medium text-gray-700">
-                  👤 {controller.user.first_name} {controller.user.last_name || ''}
-                </p>
+              <div className="mt-3 p-1 bg-white rounded-lg shadow-sm relative">
+                {controller.sseReady && <StatusPanel /> }
+                <MiniLogout />
+                <div className="text-center space-y-1 pr-8">
+                  <p className="text-sm font-medium text-gray-700">
+                    👤 {controller.user.first_name} {controller.user.last_name || ''}
+                  </p>
+                  {controller.user.username && (
+                    <p className="text-xs text-gray-500">@{controller.user.username}</p>
+                  )}
+                  <p className="text-xs text-green-600">✅ Подтвержден</p>
+                </div>
               </div>
             )}
           </div>
-
-          {controller.user && (
-            <>
-            <p className="text-xs text-gray-500 text-center -mt-4 mb-4">{controller.user.username ? `@${controller.user.username}` : controller.user.first_name}</p>
-            <p className="text-xs text-green-600 text-center -mt-3 mb-4">✅ Подтвержден</p>
-            </>
-          )}
-
-          {/* {shouldShowAudioButton && <AudioButton />} */}
           
           {controller.canUseDialer && (
             <ViewSwitcher activeView={controller.activeView} onChange={controller.setActiveView} />
@@ -137,7 +138,7 @@ const MiniPhoneScreen: React.FC = () => {
           {controller.showDialer && <DialerTelegram />}
 
           <div className="mt-6 text-center">
-            <p className="text-xs text-gray-500">Powered by SIP.js & Telegram Web Apps</p>
+            <p className="text-xs text-gray-500">Telegram Web Apps</p>
           </div>
         </div>
       </div>

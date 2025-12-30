@@ -1,0 +1,194 @@
+.statusPanel {
+  transition: all 0.3s ease;
+}
+
+.statusPanel:hover {
+  opacity: 0.8;
+}
+
+.statusRow {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.statusItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.statusIndicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 20%;
+  flex-shrink: 0;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.statusIndicator svg {
+  width: 14px;
+  height: 14px;
+  color: currentColor;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+.statusOnline {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2),
+              0 2px 4px rgba(16, 185, 129, 0.3);
+}
+
+.statusOffline {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: white;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2),
+              0 2px 4px rgba(239, 68, 68, 0.3);
+  animation: none;
+}
+
+.statusReconnecting {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: white;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.2),
+              0 2px 4px rgba(245, 158, 11, 0.3);
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.statusIcon {
+  font-size: 20px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.statusInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.statusLabel {
+  font-size: 11px;
+  font-weight: 500;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  line-height: 1.2;
+}
+
+.statusValue {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.accountInfo {
+  margin-left: auto;
+  padding: 6px 12px;
+  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+}
+
+.accountLabel {
+  font-size: 12px;
+  font-weight: 500;
+  color: #475569;
+  white-space: nowrap;
+}
+
+/* Статусы сессии */
+.sessionActive {
+  color: #10b981;
+}
+
+.sessionConnecting {
+  color: #3b82f6;
+}
+
+.sessionBusy {
+  color: #f59e0b;
+}
+
+.sessionTimeout {
+  color: #ef4444;
+}
+
+/* Предупреждение */
+.warning {
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border: 1px solid #fbbf24;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #92400e;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Адаптивность */
+@media (max-width: 640px) {
+  .statusPanel {
+    padding: 12px 16px;
+  }
+
+  .statusRow {
+    gap: 16px;
+  }
+
+  .statusItem {
+    gap: 8px;
+  }
+
+  .statusValue {
+    font-size: 13px;
+  }
+
+  .accountInfo {
+    width: 100%;
+    margin-left: 0;
+    margin-top: 8px;
+    text-align: center;
+  }
+}
