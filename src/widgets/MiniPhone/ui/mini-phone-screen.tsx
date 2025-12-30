@@ -113,10 +113,13 @@ const MiniPhoneScreen: React.FC = () => {
             <h1 className="text-2xl font-bold text-gray-800 mb-2">📞 MiniPhone</h1>
 
             {controller.user && (
-              <div className="mt-3 p-1 bg-white rounded-lg shadow-sm relative">
-                {controller.sseReady && <StatusPanel /> }
-                <MiniLogout />
-                <div className="text-center space-y-1 pr-8">
+              <div className="mt-3 p-3 bg-white rounded-lg shadow-sm flex items-center gap-3">
+                {controller.sseReady && (
+                  <div className="flex-shrink-0">
+                    <StatusPanel />
+                  </div>
+                )}
+                <div className="flex-1 text-center space-y-1">
                   <p className="text-sm font-medium text-gray-700">
                     👤 {controller.user.first_name} {controller.user.last_name || ''}
                   </p>
@@ -124,6 +127,9 @@ const MiniPhoneScreen: React.FC = () => {
                     <p className="text-xs text-gray-500">@{controller.user.username}</p>
                   )}
                   <p className="text-xs text-green-600">✅ Подтвержден</p>
+                </div>
+                <div className="flex-shrink-0">
+                  <MiniLogout />
                 </div>
               </div>
             )}
