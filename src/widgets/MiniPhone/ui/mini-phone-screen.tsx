@@ -27,7 +27,7 @@ interface ViewSwitcherProps {
   onChange: (view: MiniPhoneView) => void;
 }
 
-const ViewSwitcher: React.FC<ViewSwitcherProps> = ({ activeView, onChange }) => (
+export const ViewSwitcher: React.FC<ViewSwitcherProps> = ({ activeView, onChange }) => (
   <div className="mb-4 flex rounded-lg border border-gray-200 bg-white p-1 shadow-sm">
     <button
       type="button"
