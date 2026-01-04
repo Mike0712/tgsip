@@ -1,24 +1,31 @@
 import React, { ReactElement } from 'react';
 import { render, RenderOptions } from '@testing-library/react';
 import { Provider } from 'react-redux';
-import { configureStore, PreloadedState } from '@reduxjs/toolkit';
+import { configureStore } from '@reduxjs/toolkit';
 import type { RootState, AppDispatch } from '@/app/store';
 import sipReducer from '@/entities/WebRtc/model/slice';
 
+// Тип для частичного состояния (замена PreloadedState)
+type DeepPartial<T> = T extends object
+  ? {
+      [P in keyof T]?: DeepPartial<T[P]>;
+    }
+  : T;
+
 // Создаем функцию для создания тестового store
-function createTestStore(preloadedState?: PreloadedState<RootState>) {
+function createTestStore(preloadedState?: DeepPartial<RootState>) {
   return configureStore({
     reducer: {
       sip: sipReducer,
       // Добавьте другие редьюсеры по мере необходимости
     },
-    preloadedState,
+    ...(preloadedState && { preloadedState: preloadedState as RootState }),
   });
 }
 
 // Тип для кастомного render с Redux
 interface CustomRenderOptions extends Omit<RenderOptions, 'wrapper'> {
-  preloadedState?: PreloadedState<RootState>;
+  preloadedState?: DeepPartial<RootState>;
   store?: ReturnType<typeof createTestStore>;
 }
 

@@ -139,6 +139,7 @@ export const useMiniPhoneController = (): UseMiniPhoneControllerResult => {
   }, [callMode, inviteStatus, callPartner, selectedAccount, dispatch]);
 
   useEffect(() => {
+    console.log(isClient, !isAuthenticated, !isLoading, !attemptedAuth)
     if (isClient && !isAuthenticated && !isLoading && !attemptedAuth) {
       const handleTelegramAuth = async () => {
         if (typeof window !== 'undefined' && window.Telegram?.WebApp) {

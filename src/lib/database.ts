@@ -10,32 +10,41 @@ declare global {
 const environment = process.env.NODE_ENV || 'development';
 const config = knexConfig[environment as keyof typeof knexConfig];
 
-// Добавляем настройки пула, если их нет
-const configWithPool: Knex.Config = {
+// Нормализуем конфигурацию для TypeScript
+// Приводим к Knex.Config, так как knexfile.js может иметь неполную типизацию
+const normalizedConfig = {
   ...config,
+  connection: config.connection
+    ? {
+        ...config.connection,
+        port: typeof config.connection.port === 'string' 
+          ? parseInt(config.connection.port, 10) 
+          : config.connection.port,
+      }
+    : undefined,
   pool: {
+    ...(config.pool || {}),
     min: 2,
     max: 20, // Увеличиваем max для production
     acquireTimeoutMillis: 30000,
     idleTimeoutMillis: 30000,
     reapIntervalMillis: 1000,
     createTimeoutMillis: 30000,
-    ...(config.pool || {}),
   },
-};
+} as Knex.Config;
 
 // Singleton для database.ts
 function getDatabaseInstance(): Knex {
   if (process.env.NODE_ENV === 'development') {
     if (!global.__db_instance) {
-      global.__db_instance = knex(configWithPool);
+      global.__db_instance = knex(normalizedConfig);
     }
     return global.__db_instance;
   }
 
   // В production используем модульный singleton
   if (!(getDatabaseInstance as any).__instance) {
-    (getDatabaseInstance as any).__instance = knex(configWithPool);
+    (getDatabaseInstance as any).__instance = knex(normalizedConfig);
   }
   return (getDatabaseInstance as any).__instance;
 }

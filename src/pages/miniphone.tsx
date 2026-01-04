@@ -4,14 +4,19 @@ import React, { useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { MiniPhoneScreen } from '@/widgets/MiniPhone';
 import { useAuth } from '@/shared/hooks/useAuth';
+import { useMiniPhoneController } from '@/shared/hooks/useMiniPhoneController';
 
 const MiniPhone = () => {
   const router = useRouter();
   const { isAuthenticated, isLoading, user } = useAuth();
-
+  useMiniPhoneController();
+  
   useEffect(() => {
-    if (!isLoading && false === isAuthenticated) {
-      router.replace('/signin');
+    if (!isLoading && !isAuthenticated) {
+      router.replace({
+        pathname: '/signin',
+        query: router.query,
+      });
     }
   }, [isAuthenticated, isLoading, router]);
 
@@ -27,7 +32,7 @@ const MiniPhone = () => {
   }
 
   if (!isAuthenticated || !user) {
-    return null; // Редирект произойдет через useEffect
+    return null;
   }
 
   return <MiniPhoneScreen />;

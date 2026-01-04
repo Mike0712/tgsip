@@ -1,7 +1,8 @@
 'use client';
 
 import React, { createContext, useContext, useMemo, ReactNode, useEffect, useState } from 'react';
-import { getTranslations, type Translations } from './loader';
+import { getTranslations } from './loader';
+import type { Translations } from './loader';
 import { getLanguageFromCode, type Language, defaultLanguage } from './index';
 
 interface I18nContextValue {

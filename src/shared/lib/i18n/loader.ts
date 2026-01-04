@@ -1,7 +1,7 @@
 import ruTranslations from './translations/ru.json';
 import enTranslations from './translations/en.json';
 
-type Translations = Map<string, string>;
+export type Translations = Map<string, string>;
 
 const translationFiles: Record<string, Record<string, string>> = {
   ru: ruTranslations,
