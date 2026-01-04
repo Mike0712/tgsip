@@ -15,11 +15,10 @@ import {
   setUserPhones,
 } from '@/entities/WebRtc/model/slice';
 import { getSipServiceInstance } from '@/entities/WebRtc/services/sipServiceInstance';
-import { getTelegramInitData } from '@/shared/lib/telegramUtils';
 
 export type MiniPhoneView = 'general' | 'dialer';
 
-export interface UseMiniPhoneControllerResult {
+interface UseMiniPhoneControllerResult {
   isLoadingAuth: boolean;
   isAuthenticated: boolean;
   user: ReturnType<typeof useAuth>['user'];
@@ -39,8 +38,11 @@ export const useMiniPhoneController = (): UseMiniPhoneControllerResult => {
   const dispatch = useDispatch<AppDispatch>();
   const searchParams = useSearchParams();
 
-  const { user, isAuthenticated, isLoading, loginWithTelegram } = useAuth();
-  const { eventSource } = useSSE(user?.id ? user.id.toString() : "");
+  const { user, isAuthenticated, isLoading } = useAuth();
+  let sseItem = null;
+  if (user?.id) {
+    sseItem = useSSE(user.id.toString());
+  }
 
   const [isClient, setIsClient] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -139,23 +141,10 @@ export const useMiniPhoneController = (): UseMiniPhoneControllerResult => {
   }, [callMode, inviteStatus, callPartner, selectedAccount, dispatch]);
 
   useEffect(() => {
-    console.log(isClient, !isAuthenticated, !isLoading, !attemptedAuth)
     if (isClient && !isAuthenticated && !isLoading && !attemptedAuth) {
       const handleTelegramAuth = async () => {
         if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
-          const initData = getTelegramInitData();
-          if (initData) {
-            const result = await loginWithTelegram(initData);
-
-            if (!result.success) {
-              setAuthError(result.error || 'Ошибка аутентификации');
-              console.error('Authentication failed:', result.error);
-            } else {
-              setAuthError(null);
-            }
-          } else {
-            setAuthError('Данные Telegram недоступны');
-          }
+          setAuthError('Данные Telegram недоступны');
         } else {
           setAuthError('Telegram Web App недоступен');
         }
@@ -164,7 +153,7 @@ export const useMiniPhoneController = (): UseMiniPhoneControllerResult => {
       setAttemptedAuth(true);
       handleTelegramAuth();
     }
-  }, [isClient, isAuthenticated, isLoading, attemptedAuth, loginWithTelegram]);
+  }, [isClient, isAuthenticated, isLoading, attemptedAuth]);
 
   useEffect(() => {
     if (isAuthenticated && typeof window !== 'undefined' && window.Telegram?.WebApp) {
@@ -195,48 +184,63 @@ export const useMiniPhoneController = (): UseMiniPhoneControllerResult => {
     }
   }, [isAuthenticated]);
 
-  eventSource?.addEventListener('open', () => {
-    const loadUserData = async () => {
-      if (!isAuthenticated) return;
+  useEffect(() => {
+    const eventSource = sseItem?.eventSource;
+    if (!eventSource) return;
 
-      try {
-        const sipResponse = await apiClient.getSipAccounts();
-
-        if (sipResponse.success && sipResponse.data) {
-          const sipData = sipResponse.data;
-          const accounts: SipAccount[] = Array.isArray(sipData)
-            ? sipData
-            : ((sipData as unknown as { accounts?: SipAccount[] }).accounts ?? []);
-
-          dispatch(setSipAccounts(accounts));
-          const activeAccount = accounts.find((acc) => acc.is_active);
-          if (activeAccount) {
-            dispatch(setSelectedAccount(activeAccount));
+    const handleOpen = () => {
+      const loadUserData = async () => {
+        if (!isAuthenticated) return;
+  
+        try {
+          const sipResponse = await apiClient.getSipAccounts();
+  
+          if (sipResponse.success && sipResponse.data) {
+            const sipData = sipResponse.data;
+            const accounts: SipAccount[] = Array.isArray(sipData)
+              ? sipData
+              : ((sipData as unknown as { accounts?: SipAccount[] }).accounts ?? []);
+  
+            dispatch(setSipAccounts(accounts));
+            const activeAccount = accounts.find((acc) => acc.is_active);
+            if (activeAccount) {
+              dispatch(setSelectedAccount(activeAccount));
+            }
+          } else {
+            console.error('Failed to load SIP accounts:', sipResponse.error);
           }
-        } else {
-          console.error('Failed to load SIP accounts:', sipResponse.error);
+  
+          const phonesResponse = await apiClient.getUserPhones();
+  
+          if (phonesResponse.success && phonesResponse.data) {
+            const phonesPayload = phonesResponse.data;
+            const phones: UserPhone[] = Array.isArray(phonesPayload)
+              ? phonesPayload
+              : phonesPayload.phones || [];
+  
+            dispatch(setUserPhones(phones));
+            setSseReady(true);
+          } else {
+            console.error('Failed to load user phones:', phonesResponse.error);
+          }
+        } catch (error) {
+          console.error('Error loading user data:', error);
         }
-
-        const phonesResponse = await apiClient.getUserPhones();
-
-        if (phonesResponse.success && phonesResponse.data) {
-          const phonesPayload = phonesResponse.data;
-          const phones: UserPhone[] = Array.isArray(phonesPayload)
-            ? phonesPayload
-            : phonesPayload.phones || [];
-
-          dispatch(setUserPhones(phones));
-          setSseReady(true);
-        } else {
-          console.error('Failed to load user phones:', phonesResponse.error);
-        }
-      } catch (error) {
-        console.error('Error loading user data:', error);
-      }
+      };
+  
+      loadUserData();
     };
 
-    loadUserData();
-  }, { once: true });
+    if (eventSource.readyState === EventSource.OPEN) {
+      handleOpen();
+    } else {
+      eventSource.addEventListener('open', handleOpen, { once: true });
+    }
+
+    return () => {
+      eventSource.removeEventListener('open', handleOpen);
+    };
+  }, [sseItem?.eventSource, isAuthenticated, dispatch]);
 
   const handleRegistrationSuccess = useCallback(async (token: string) => {
     localStorage.setItem('auth_token', token);

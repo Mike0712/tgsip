@@ -36,11 +36,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
   } catch (error) {
+    if (error instanceof jwt.TokenExpiredError) {
+      return res.status(401).json({ 
+        success: false,
+        error: 'Token expired',
+        expired: true 
+      });
+    }
+    
     if (error instanceof jwt.JsonWebTokenError) {
-      return res.status(401).json({ error: 'Invalid token' });
+      return res.status(401).json({ 
+        success: false,
+        error: 'Invalid token' 
+      });
     }
     
     console.error('Token verification error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ 
+      success: false,
+      error: 'Internal server error' 
+    });
   }
 }
