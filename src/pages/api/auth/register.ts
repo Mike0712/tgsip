@@ -43,7 +43,7 @@ function getTelegramUser(req: NextApiRequest): TelegramUser | null {
 
 // Добавляем пользователя в Asterisk и получаем учетные данные
 async function addUserToAsterisk(telegramId: string, serverIp: string, webPort: number): Promise<AsteriskResponse> {
-  const apiUrl = `http://${serverIp}:${webPort}/api/endpoints/add`;
+  const apiUrl = `http://${serverIp}:${webPort}/api/endpoints`;
 
   logger.info(`📞 Adding user ${telegramId} to Asterisk via ${serverIp}:${webPort}`);
 
