@@ -19,7 +19,7 @@ import { getTelegramInitData } from '@/shared/lib/telegramUtils';
 
 export type MiniPhoneView = 'general' | 'dialer';
 
-interface UseMiniPhoneControllerResult {
+export interface UseMiniPhoneControllerResult {
   isLoadingAuth: boolean;
   isAuthenticated: boolean;
   user: ReturnType<typeof useAuth>['user'];
