@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { apiClient } from '@/lib/api';
 
-interface User {
+export interface User {
   id: number;
   telegram_id: string;
   username?: string;
@@ -45,7 +45,6 @@ export function useAuth() {
             isAuthenticated: true,
           });
         } else {
-          // Токен недействителен
           localStorage.removeItem('auth_token');
           setAuthState({
             user: null,
@@ -102,7 +101,6 @@ export function useAuth() {
     }
   }, []);
 
-  // Выход из системы
   const logout = useCallback(async () => {
     try {
       await apiClient.logout();

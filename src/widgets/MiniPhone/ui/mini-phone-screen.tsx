@@ -4,7 +4,7 @@ import React from 'react';
 import dynamic from 'next/dynamic';
 import { useSelector } from 'react-redux';
 import { RootState } from '@/app/store';
-import { MiniPhoneView, UseMiniPhoneControllerResult } from '@/shared/hooks/useMiniPhoneController';
+import { MiniPhoneView, useMiniPhoneController, UseMiniPhoneControllerResult } from '@/shared/hooks/useMiniPhoneController';
 import { AlertProvider } from '@/shared/hooks/useAlert';
 import { AlertContainer } from '@/shared/lib/AlertContainer';
 import { BridgeManager } from '@/widgets/BridgeManager';
@@ -63,8 +63,9 @@ export const ViewSwitcher: React.FC<ViewSwitcherProps> = ({ activeView, onChange
   );
 };
 
-  const MiniPhoneScreen: React.FC<{ controller: UseMiniPhoneControllerResult }> = ({ controller }) => {
+  const MiniPhoneScreen: React.FC = () => {
   const t = useTranslation();
+  const controller = useMiniPhoneController();
   const sessionState = useSelector((state: RootState) => state.sip.sessionState);
   const inviteStatus = useSelector((state: RootState) => state.sip.inviteStatus);
   const callStatus = useSelector((state: RootState) => state.sip.callStatus);

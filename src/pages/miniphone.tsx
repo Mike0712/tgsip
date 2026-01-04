@@ -4,20 +4,25 @@ import React, { useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { MiniPhoneScreen } from '@/widgets/MiniPhone';
 import { useAuth } from '@/shared/hooks/useAuth';
-import { useMiniPhoneController } from '@/shared/hooks/useMiniPhoneController';
+import { getTelegramInitData } from '@/shared/lib/telegramUtils';
 
 const MiniPhone = () => {
   const router = useRouter();
-  const { isAuthenticated, isLoading, user } = useAuth();
-  const controller = useMiniPhoneController();
+  const { isAuthenticated, isLoading, user, loginWithTelegram } = useAuth();
+
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      router.replace({
-        pathname: '/signin',
-        query: router.query,
-      });
+      const initData = getTelegramInitData();
+      if (initData) {
+        loginWithTelegram(initData);
+      } else {
+        router.replace({
+          pathname: '/signin',
+          query: router.query,
+        });
+      }
     }
-  }, [isAuthenticated, isLoading, router]);
+  }, [isAuthenticated, isLoading, loginWithTelegram, router]);
 
   if (isLoading) {
     return (
@@ -34,7 +39,7 @@ const MiniPhone = () => {
     return null;
   }
 
-  return <MiniPhoneScreen controller={controller} />;
+  return <MiniPhoneScreen user={user} />;
 };
 
 export default MiniPhone;
