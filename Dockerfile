@@ -35,6 +35,8 @@ COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/next.config.mjs ./next.config.mjs
 COPY --from=builder /app/public ./public
+COPY --from=builder /app/knexfile.js ./knexfile.js
+COPY --from=builder /app/src/database/migrations ./src/database/migrations
 # Копируем только production node_modules (быстрее чем переустановка)
 COPY --from=builder /app/node_modules ./node_modules
 EXPOSE 3000

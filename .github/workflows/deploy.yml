@@ -71,5 +71,5 @@ jobs:
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
           port: ${{ secrets.SSH_PORT || 22 }}
           script: |
-            cd ${{ secrets.PROJECT_DIR }}/tgsip
-            docker compose -f docker-compose.ci.yml exec tgsip npm run migrate
+            cd ${{ secrets.PROJECT_DIR }}
+            docker compose -f docker-compose.ci.yml exec tgsip npm run db:migrate
