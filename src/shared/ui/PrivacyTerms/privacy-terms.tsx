@@ -42,6 +42,14 @@ const PrivacyTerms: React.FC<PrivacyTermsProps> = ({ open, onOpenChange }) => {
                 <h3 className="font-semibold text-base mb-2">{t('Privacy Section 4 Title')}</h3>
                 <p>{t('Privacy Section 4 Content')}</p>
               </div>
+              <div>
+                <h3 className="font-semibold text-base mb-2">{t('Privacy Section 5 Title')}</h3>
+                <p>{t('Privacy Section 5 Content')}</p>
+              </div>
+              <div>
+                <h3 className="font-semibold text-base mb-2">{t('Privacy Section 6 Title')}</h3>
+                <p>{t('Privacy Section 6 Content')}</p>
+              </div>
             </div>
           </div>
 
@@ -67,6 +75,14 @@ const PrivacyTerms: React.FC<PrivacyTermsProps> = ({ open, onOpenChange }) => {
               <div>
                 <h3 className="font-semibold text-base mb-2">{t('Terms Section 4 Title')}</h3>
                 <p>{t('Terms Section 4 Content')}</p>
+              </div>
+              <div>
+                <h3 className="font-semibold text-base mb-2">{t('Terms Section 5 Title')}</h3>
+                <p>{t('Terms Section 5 Content')}</p>
+              </div>
+              <div>
+                <h3 className="font-semibold text-base mb-2">{t('Terms Section 6 Title')}</h3>
+                <p>{t('Terms Section 6 Content')}</p>
               </div>
             </div>
           </div>

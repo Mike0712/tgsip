@@ -33,8 +33,6 @@ const SignInPage = () => {
             localStorage.setItem('auth_token', response.data.token);
             apiClient.setToken(response.data.token);
             router.replace('/miniphone');
-          } else {
-            setErrorMsg(response.error || 'Ошибка аутентификации');
           }
         }).catch((error) => {
           setErrorMsg(error instanceof Error ? error.message : 'Ошибка аутентификации');
