@@ -15,6 +15,7 @@ import {
   setUserPhones,
 } from '@/entities/WebRtc/model/slice';
 import { getSipServiceInstance } from '@/entities/WebRtc/services/sipServiceInstance';
+import { getTelegramInitData } from '@/shared/lib/telegramUtils';
 
 export type MiniPhoneView = 'general' | 'dialer';
 
@@ -138,15 +139,11 @@ export const useMiniPhoneController = (): UseMiniPhoneControllerResult => {
   }, [callMode, inviteStatus, callPartner, selectedAccount, dispatch]);
 
   useEffect(() => {
+    console.log(isClient, !isAuthenticated, !isLoading, !attemptedAuth)
     if (isClient && !isAuthenticated && !isLoading && !attemptedAuth) {
       const handleTelegramAuth = async () => {
         if (typeof window !== 'undefined' && window.Telegram?.WebApp) {
-          const tg = window.Telegram.WebApp;
-          let initData = tg.initData;
-          if (process.env.NODE_ENV === 'development') {
-            const devParams = new URLSearchParams(window.location.search);
-            initData = devParams.get('user') as string;
-          }
+          const initData = getTelegramInitData();
           if (initData) {
             const result = await loginWithTelegram(initData);
 

@@ -1,10 +1,67 @@
 import knex, { Knex } from 'knex';
 import knexConfig from '../../knexfile';
 
+// Используем глобальный объект для хранения соединения (выживает при hot reload)
+declare global {
+  // eslint-disable-next-line no-var
+  var __db_instance: Knex | undefined;
+}
+
 const environment = process.env.NODE_ENV || 'development';
 const config = knexConfig[environment as keyof typeof knexConfig];
 
-export const db = knex(config as Knex.Config);
+// Нормализуем конфигурацию для TypeScript
+// Приводим к Knex.Config, так как knexfile.js может иметь неполную типизацию
+const normalizedConfig = {
+  ...config,
+  connection: config.connection
+    ? {
+        ...config.connection,
+        port: typeof config.connection.port === 'string' 
+          ? parseInt(config.connection.port, 10) 
+          : config.connection.port,
+      }
+    : undefined,
+  pool: {
+    ...(config.pool || {}),
+    min: 2,
+    max: 20, // Увеличиваем max для production
+    acquireTimeoutMillis: 30000,
+    idleTimeoutMillis: 30000,
+    reapIntervalMillis: 1000,
+    createTimeoutMillis: 30000,
+  },
+} as Knex.Config;
+
+// Singleton для database.ts
+function getDatabaseInstance(): Knex {
+  if (process.env.NODE_ENV === 'development') {
+    if (!global.__db_instance) {
+      global.__db_instance = knex(normalizedConfig);
+    }
+    return global.__db_instance;
+  }
+
+  // В production используем модульный singleton
+  if (!(getDatabaseInstance as any).__instance) {
+    (getDatabaseInstance as any).__instance = knex(normalizedConfig);
+  }
+  return (getDatabaseInstance as any).__instance;
+}
+
+export const db = getDatabaseInstance();
+
+// Функция для закрытия соединений (можно вызвать при необходимости)
+export async function closeDatabase(): Promise<void> {
+  if (global.__db_instance) {
+    await global.__db_instance.destroy();
+    global.__db_instance = undefined;
+  }
+  if ((getDatabaseInstance as any).__instance) {
+    await (getDatabaseInstance as any).__instance.destroy();
+    (getDatabaseInstance as any).__instance = undefined;
+  }
+}
 
 // Типы для базы данных
 export interface User {
@@ -17,6 +74,9 @@ export interface User {
   is_premium: boolean;
   photo_url?: string;
   last_seen: Date;
+  agreement_accepted: boolean;
+  agreement_accepted_at?: Date;
+  deleted_at?: Date;
   created_at: Date;
   updated_at: Date;
 }
@@ -72,37 +132,75 @@ export interface UserPhone {
 
 // Функции для работы с пользователями
 export const userService = {
-  async findById(id: number): Promise<User | null> {
-    return await db('users').where('id', id).first();
+  async findById(id: number, includeDeleted = false): Promise<User | null> {
+    const query = db('users').where('id', id);
+    if (!includeDeleted) {
+      query.whereNull('deleted_at');
+    }
+    return await query.first();
   },
 
-  async findByTelegramId(telegramId: string): Promise<User | null> {
-    return await db('users').where('telegram_id', telegramId).first();
+  async findByTelegramId(telegramId: string, includeDeleted = false): Promise<User | null> {
+    const query = db('users').where('telegram_id', telegramId);
+    if (!includeDeleted) {
+      query.whereNull('deleted_at');
+    }
+    return await query.first();
   },
 
-  async findByUsername(username: string): Promise<User | null> {
-    return await db('users').where('username', username).first();
+  async findByUsername(username: string, includeDeleted = false): Promise<User | null> {
+    const query = db('users').where('username', username);
+    if (!includeDeleted) {
+      query.whereNull('deleted_at');
+    }
+    return await query.first();
   },
 
   async create(userData: Partial<User>): Promise<User> {
-    const [user] = await db('users').insert(userData).returning('*');
+    const [user] = await db('users').insert({
+      ...userData,
+      agreement_accepted: userData.agreement_accepted ?? false,
+    }).returning('*');
     return user;
   },
 
   async update(id: number, userData: Partial<User>): Promise<User> {
-    const [user] = await db('users').where('id', id).update(userData).returning('*');
+    const [user] = await db('users')
+      .where('id', id)
+      .whereNull('deleted_at')
+      .update(userData)
+      .returning('*');
     return user;
   },
 
   async updateLastSeen(id: number): Promise<void> {
-    await db('users').where('id', id).update({ last_seen: new Date() });
+    await db('users')
+      .where('id', id)
+      .whereNull('deleted_at')
+      .update({ last_seen: new Date() });
   },
 
-  async findAll(): Promise<User[]> {
-    return await db('users').orderBy('created_at', 'desc');
+  async acceptAgreement(id: number): Promise<User> {
+    const [user] = await db('users')
+      .where('id', id)
+      .whereNull('deleted_at')
+      .update({
+        agreement_accepted: true,
+        agreement_accepted_at: new Date(),
+      })
+      .returning('*');
+    return user;
   },
 
-  async search(query: string, limit = 10): Promise<User[]> {
+  async findAll(includeDeleted = false): Promise<User[]> {
+    const query = db('users');
+    if (!includeDeleted) {
+      query.whereNull('deleted_at');
+    }
+    return await query.orderBy('created_at', 'desc');
+  },
+
+  async search(query: string, limit = 10, includeDeleted = false): Promise<User[]> {
     const trimmed = query.trim();
 
     if (!trimmed) {
@@ -112,16 +210,61 @@ export const userService = {
     const sanitized = trimmed.replace(/[%_]/g, '\\$&');
     const safeLimit = Math.min(Math.max(limit ?? 10, 1), 25);
 
-    return await db('users')
+    const dbQuery = db('users')
       .where((builder) => {
         builder
           .whereRaw('telegram_id ILIKE ?', [`%${sanitized}%`])
           .orWhereRaw('username ILIKE ?', [`%${sanitized}%`])
           .orWhereRaw('first_name ILIKE ?', [`%${sanitized}%`])
           .orWhereRaw('last_name ILIKE ?', [`%${sanitized}%`]);
-      })
+      });
+
+    if (!includeDeleted) {
+      dbQuery.whereNull('deleted_at');
+    }
+
+    return await dbQuery
       .orderBy('last_seen', 'desc')
       .limit(safeLimit);
+  },
+
+  /**
+   * Soft delete пользователя - устанавливает deleted_at
+   */
+  async softDelete(id: number): Promise<User> {
+    const [user] = await db('users')
+      .where('id', id)
+      .whereNull('deleted_at')
+      .update({
+        deleted_at: new Date(),
+      })
+      .returning('*');
+    return user;
+  },
+
+  /**
+   * Восстановление удаленного пользователя
+   */
+  async restore(id: number): Promise<User> {
+    const [user] = await db('users')
+      .where('id', id)
+      .whereNotNull('deleted_at')
+      .update({
+        deleted_at: null,
+      })
+      .returning('*');
+    return user;
+  },
+
+  /**
+   * Полное удаление пользователя из базы (hard delete)
+   * Использовать с осторожностью!
+   */
+  async hardDelete(id: number): Promise<boolean> {
+    const deleted = await db('users')
+      .where('id', id)
+      .del();
+    return deleted > 0;
   }
 };
 

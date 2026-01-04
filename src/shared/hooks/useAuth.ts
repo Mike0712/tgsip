@@ -25,7 +25,6 @@ export function useAuth() {
     isAuthenticated: false,
   });
 
-  // Проверяем токен при загрузке
   useEffect(() => {
     const checkAuth = async () => {
       const token = localStorage.getItem('auth_token');

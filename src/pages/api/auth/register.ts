@@ -1,7 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { userService, sessionService, registrationRequestService } from '../../../lib/database';
+import { userService, sessionService, registrationRequestService, db } from '../../../lib/database';
 import { createToken } from '../../../lib/auth';
-import { getDb } from '@/lib/db';
 import logger from '../logger';
 
 interface TelegramUser {
@@ -103,7 +102,12 @@ async function findOrCreateUser(db: any, telegramUser: TelegramUser, first_name:
       language_code: telegramUser.language_code,
       is_premium: telegramUser.is_premium || false,
       photo_url: telegramUser.photo_url,
+      agreement_accepted: true, // Пользователь согласился с условиями при регистрации
+      agreement_accepted_at: new Date(),
     });
+  } else if (!user.agreement_accepted) {
+    // Если пользователь уже существует, но не принял соглашение, обновляем
+    user = await userService.acceptAgreement(user.id);
   }
   return user;
 }
@@ -174,7 +178,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'Telegram user data is required' });
     }
     const telegramId = String(telegramUser.id);
-    const db = getDb();
 
     let registrationRequest;
     try {

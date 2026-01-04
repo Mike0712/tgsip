@@ -10,9 +10,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  // TODO: Добавить проверку роли администратора
-  // Пока разрешаем всем аутентифицированным пользователям
-
   try {
     switch (req.method) {
       case 'GET':
@@ -40,10 +37,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           return res.status(400).json({ error: 'telegram_id and first_name are required' });
         }
 
-        // Проверяем не существует ли уже пользователь
-        const existingUser = await userService.findByTelegramId(telegram_id.toString());
-        if (existingUser) {
+        // Проверяем не существует ли уже пользователь (включая удаленных)
+        const existingUser = await userService.findByTelegramId(telegram_id.toString(), true);
+        if (existingUser && !existingUser.deleted_at) {
           return res.status(409).json({ error: 'User already exists' });
+        }
+        // Если пользователь был удален, восстанавливаем его
+        if (existingUser && existingUser.deleted_at) {
+          const restoredUser = await userService.restore(existingUser.id);
+          return res.status(200).json({
+            success: true,
+            user: {
+              id: restoredUser.id,
+              telegram_id: restoredUser.telegram_id,
+              username: restoredUser.username,
+              first_name: restoredUser.first_name,
+              last_name: restoredUser.last_name
+            },
+            restored: true
+          });
         }
 
         const newUser = await userService.create({

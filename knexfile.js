@@ -16,6 +16,14 @@ module.exports = {
     },
     seeds: {
       directory: path.join(__dirname, 'src/database/seeds')
+    },
+    pool: {
+      min: 2,
+      max: 20,
+      acquireTimeoutMillis: 30000,
+      idleTimeoutMillis: 30000,
+      reapIntervalMillis: 1000,
+      createTimeoutMillis: 30000
     }
   },
 
@@ -35,7 +43,11 @@ module.exports = {
     },
     pool: {
       min: 2,
-      max: 10
+      max: 20,
+      acquireTimeoutMillis: 30000,
+      idleTimeoutMillis: 30000,
+      reapIntervalMillis: 1000,
+      createTimeoutMillis: 30000
     }
   }
 };

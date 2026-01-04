@@ -1,18 +1,9 @@
 import { useCallback } from 'react';
 import { apiClient } from '@/lib/api';
-
-interface InitDataUnsafe {
-  user?: {
-    id: number;
-    is_bot?: boolean;
-    first_name: string;
-    last_name?: string;
-    username?: string;
-  };
-}
+import { getTelegramInitDataUnsafe } from '@/shared/lib/telegramUtils';
 
 interface UseRegistrationRequestReturn {
-  submitRegistrationRequest: () => Promise<boolean>; // возвращает true при успехе
+  submitRegistrationRequest: () => Promise<boolean>;
 }
 
 export const useRegistrationRequest = (
@@ -20,33 +11,7 @@ export const useRegistrationRequest = (
 ): UseRegistrationRequestReturn => {
   const submitRegistrationRequest = useCallback(async (): Promise<boolean> => {
     try {
-      let initDataUnsafe: InitDataUnsafe | undefined;
-      
-      // В production режиме используем Telegram Web App
-      if (typeof window !== 'undefined' && window.Telegram?.WebApp?.initDataUnsafe) {
-        initDataUnsafe = window.Telegram.WebApp.initDataUnsafe;
-      }
-      
-      // В dev режиме получаем данные из URL параметров
-      if (process.env.NODE_ENV === 'development') {
-        const searchParams = new URLSearchParams(window.location.search);
-        const userParam = searchParams.get('user');
-        if (userParam) {
-          try {
-            const decodedParam = decodeURIComponent(userParam);
-            const userData = JSON.parse(decodedParam);
-            initDataUnsafe = { user: userData };
-          } catch (parseError) {
-            console.error('❌ Failed to parse user param:', parseError);
-            showAlert(
-              'Ошибка парсинга данных',
-              parseError instanceof Error ? parseError.message : 'Unknown error',
-              'error'
-            );
-            return false;
-          }
-        }
-      }
+      const initDataUnsafe = getTelegramInitDataUnsafe();
 
       if (!initDataUnsafe?.user) {
         showAlert(
