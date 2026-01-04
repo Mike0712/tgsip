@@ -10,7 +10,6 @@ const MiniPhone = () => {
   const router = useRouter();
   const { isAuthenticated, isLoading, user } = useAuth();
   useMiniPhoneController();
-  
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.replace({
