@@ -9,7 +9,7 @@ import { useMiniPhoneController } from '@/shared/hooks/useMiniPhoneController';
 const MiniPhone = () => {
   const router = useRouter();
   const { isAuthenticated, isLoading, user } = useAuth();
-  useMiniPhoneController();
+  const controller = useMiniPhoneController();
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.replace({
@@ -34,7 +34,7 @@ const MiniPhone = () => {
     return null;
   }
 
-  return <MiniPhoneScreen />;
+  return <MiniPhoneScreen controller={controller} />;
 };
 
 export default MiniPhone;
