@@ -8,18 +8,23 @@ import { useMiniPhoneController, MiniPhoneView } from '@/shared/hooks/useMiniPho
 import { AlertProvider } from '@/shared/hooks/useAlert';
 import { AlertContainer } from '@/shared/lib/AlertContainer';
 import { BridgeManager } from '@/widgets/BridgeManager';
-import FriendlyRetryScreen from '@/features/AuthError/ui/FriendlyRetryScreen';
 import StatusPanel from '@/entities/WebRtc/ui/Connection/StatusPanel';
 import MiniLogout from '@/entities/User/ui/Logout/MiniLogout';
+import { useTranslation } from '@/shared/hooks/useTranslation';
 
 const connectingSessionStates = new Set(['Establishing', 'Established']);
 const connectingInviteStates = new Set(['creating', 'waiting', 'connecting', 'ready', 'active']);
 const connectingCallStates = new Set(['waiting', 'connecting', 'active']);
 const connectingBridgeStates = new Set(['creating', 'active', 'terminating']);
 
+const DialerLoading = () => {
+  const t = useTranslation();
+  return <div className="bg-white rounded-2xl shadow-lg p-6 text-center">{t('Loading...')}</div>;
+};
+
 const DialerTelegram = dynamic(() => import('@/widgets/Dialer/dialer-telegram'), {
   ssr: false,
-  loading: () => <div className="bg-white rounded-2xl shadow-lg p-6 text-center">Загрузка...</div>,
+  loading: () => <DialerLoading />,
 });
 
 interface ViewSwitcherProps {
@@ -27,52 +32,39 @@ interface ViewSwitcherProps {
   onChange: (view: MiniPhoneView) => void;
 }
 
-export const ViewSwitcher: React.FC<ViewSwitcherProps> = ({ activeView, onChange }) => (
-  <div className="mb-4 flex rounded-lg border border-gray-200 bg-white p-1 shadow-sm">
-    <button
-      type="button"
-      onClick={() => onChange('dialer')}
-      className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-        activeView === 'dialer'
-          ? 'bg-blue-600 text-white shadow'
-          : 'text-gray-600 hover:bg-gray-100'
-      }`}
-    >
-      📞 Звонки
-    </button>
-    <button
-      type="button"
-      onClick={() => onChange('general')}
-      className={`ml-1 flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-        activeView === 'general'
-          ? 'bg-blue-600 text-white shadow'
-          : 'text-gray-600 hover:bg-gray-100'
-      }`}
-    >
-      🤝 Общий экран
-    </button>
-  </div>
-);
-
-const LoadingScreen = () => (
-  <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4 flex items-center justify-center">
-    <div className="text-center">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4" />
-      <p className="text-gray-600">Проверка аутентификации...</p>
+export const ViewSwitcher: React.FC<ViewSwitcherProps> = ({ activeView, onChange }) => {
+  const t = useTranslation();
+  
+  return (
+    <div className="mb-4 flex rounded-lg border border-gray-200 bg-white p-1 shadow-sm">
+      <button
+        type="button"
+        onClick={() => onChange('dialer')}
+        className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+          activeView === 'dialer'
+            ? 'bg-blue-600 text-white shadow'
+            : 'text-gray-600 hover:bg-gray-100'
+        }`}
+      >
+        📞 {t('Calls')}
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange('general')}
+        className={`ml-1 flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+          activeView === 'general'
+            ? 'bg-blue-600 text-white shadow'
+            : 'text-gray-600 hover:bg-gray-100'
+        }`}
+      >
+        🤝 {t('General Screen')}
+      </button>
     </div>
-  </div>
-);
-
-const PendingAuthScreen = () => (
-  <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4 flex items-center justify-center">
-    <div className="text-center">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4" />
-      <p className="text-gray-600">Ожидание аутентификации...</p>
-    </div>
-  </div>
-);
+  );
+};
 
 const MiniPhoneScreen: React.FC = () => {
+  const t = useTranslation();
   const controller = useMiniPhoneController();
   const sessionState = useSelector((state: RootState) => state.sip.sessionState);
   const inviteStatus = useSelector((state: RootState) => state.sip.inviteStatus);
@@ -85,32 +77,12 @@ const MiniPhoneScreen: React.FC = () => {
     connectingCallStates.has(callStatus) ||
     connectingBridgeStates.has(bridgeStatus);
 
-  if (controller.isLoadingAuth) {
-    return <LoadingScreen />;
-  }
-
-  if (controller.authError) {
-    return (
-      <AlertProvider>
-        <FriendlyRetryScreen
-          errorMsg={controller.authError}
-          onRegistrationSuccess={controller.handleRegistrationSuccess}
-        />
-        <AlertContainer />
-      </AlertProvider>
-    );
-  }
-
-  if (!controller.isAuthenticated) {
-    return <PendingAuthScreen />;
-  }
-
   return (
     <AlertProvider>
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
         <div className="max-w-md mx-auto">
           <div className="text-center mb-2">
-            <h1 className="text-2xl font-bold text-gray-800 mb-2">📞 MiniPhone</h1>
+            <h1 className="text-2xl font-bold text-gray-800 mb-2">📞 {t('MiniPhone')}</h1>
 
             {controller.user && (
               <div className="mt-3 p-3 bg-white rounded-lg shadow-sm flex items-center gap-3">
@@ -126,7 +98,7 @@ const MiniPhoneScreen: React.FC = () => {
                   {controller.user.username && (
                     <p className="text-xs text-gray-500">@{controller.user.username}</p>
                   )}
-                  <p className="text-xs text-green-600">✅ Подтвержден</p>
+                  <p className="text-xs text-green-600">✅ {t('Confirmed')}</p>
                 </div>
                 <div className="flex-shrink-0">
                   <MiniLogout />
@@ -144,7 +116,7 @@ const MiniPhoneScreen: React.FC = () => {
           {controller.showDialer && <DialerTelegram />}
 
           <div className="mt-6 text-center">
-            <p className="text-xs text-gray-500">Telegram Web Apps</p>
+            <p className="text-xs text-gray-500">{t('Telegram Web Apps')}</p>
           </div>
         </div>
       </div>

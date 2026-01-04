@@ -1,8 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRegistrationRequest } from '@/features/RegistrationRequest/model/useRegistrationRequest';
 import { useRegistration } from '@/features/Registration/model/useRegistration';
 import { useAlert } from '@/shared/hooks/useAlert';
+import { useTranslation } from '@/shared/hooks/useTranslation';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/shared/ui/Alert/alert';
+import PrivacyTerms from '@/shared/ui/PrivacyTerms/privacy-terms';
+import { getTelegramUser } from '@/shared/lib/telegramUtils';
 
 interface FriendlyRetryScreenProps {
   errorMsg: string;
@@ -11,18 +14,31 @@ interface FriendlyRetryScreenProps {
 
 const FriendlyRetryScreen: React.FC<FriendlyRetryScreenProps> = ({ errorMsg, onRegistrationSuccess }) => {
   const { showAlert } = useAlert();
+  const t = useTranslation();
   const { submitRegistrationRequest } = useRegistrationRequest(showAlert);
   const { register, isLoading: isRegistering } = useRegistration();
   const [showRegistrationModal, setShowRegistrationModal] = useState(false);
   const [firstName, setFirstName] = useState('');
   const [firstNameError, setFirstNameError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [showPrivacyTerms, setShowPrivacyTerms] = useState(false);
+
+  useEffect(() => {
+    if (showRegistrationModal && !firstName) {
+      const telegramUser = getTelegramUser();
+      if (telegramUser?.username) {
+        setFirstName(telegramUser.username);
+      }
+    }
+  }, [showRegistrationModal, firstName]);
 
   const handleSubmitRequest = async () => {
     setLoading(true);
     const success = await submitRegistrationRequest();
     setLoading(false);
     if (success) {
+      setAgreedToTerms(false); // Сбрасываем при открытии модального окна
       setShowRegistrationModal(true);
     }
   };
@@ -32,15 +48,34 @@ const FriendlyRetryScreen: React.FC<FriendlyRetryScreenProps> = ({ errorMsg, onR
       setFirstNameError('Имя обязательно для заполнения');
       return;
     }
+    
+    if (!agreedToTerms) {
+      showAlert('Ошибка', t('Agreement required'), 'error');
+      return;
+    }
+    
     setFirstNameError('');
 
     const result = await register(firstName.trim());
     if (result.success && result.token) {
       showAlert('Регистрация успешна', 'Добро пожаловать!', 'success');
       setShowRegistrationModal(false);
+      setAgreedToTerms(false);
+      setFirstName(''); // Сбрасываем имя после успешной регистрации
+      setFirstNameError('');
       onRegistrationSuccess?.(result.token);
     } else {
       showAlert('Ошибка регистрации', result.error || 'Не удалось зарегистрироваться', 'error');
+    }
+  };
+
+
+  const handleCloseRegistrationModal = (open: boolean) => {
+    setShowRegistrationModal(open);
+    if (!open) {
+      setAgreedToTerms(false); // Сбрасываем при закрытии
+      setFirstName(''); // Сбрасываем имя, чтобы при следующем открытии снова подставился username
+      setFirstNameError('');
     }
   };
 
@@ -59,7 +94,7 @@ const FriendlyRetryScreen: React.FC<FriendlyRetryScreenProps> = ({ errorMsg, onR
         </button>
       </div>
       {/* Модальное окно регистрации */}
-      <Dialog open={showRegistrationModal} onOpenChange={setShowRegistrationModal}>
+      <Dialog open={showRegistrationModal} onOpenChange={handleCloseRegistrationModal}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Окно входа в MiniPhone звонки!</DialogTitle>
@@ -88,18 +123,50 @@ const FriendlyRetryScreen: React.FC<FriendlyRetryScreenProps> = ({ errorMsg, onR
                 <p className="mt-1 text-sm text-red-500">{firstNameError}</p>
               )}
             </div>
+            <div className="flex items-start space-x-2">
+              <input
+                id="agree_terms"
+                type="checkbox"
+                checked={agreedToTerms}
+                onChange={(e) => setAgreedToTerms(e.target.checked)}
+                className="mt-1 h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                disabled={isRegistering}
+              />
+              <label htmlFor="agree_terms" className="text-sm text-gray-700 cursor-pointer">
+                {t('I agree to the')}{' '}
+                <button
+                  type="button"
+                  onClick={() => setShowPrivacyTerms(true)}
+                  className="text-green-600 hover:text-green-700 underline"
+                >
+                  {t('Privacy Policy Link')}
+                </button>
+                {' '}{t('and')}{' '}
+                <button
+                  type="button"
+                  onClick={() => setShowPrivacyTerms(true)}
+                  className="text-green-600 hover:text-green-700 underline"
+                >
+                  {t('Terms of Service Link')}
+                </button>
+              </label>
+            </div>
           </div>
           <DialogFooter>
             <button
               onClick={handleRegister}
               className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={isRegistering}
+              disabled={isRegistering || !agreedToTerms}
             >
               {isRegistering ? 'Регистрируем...' : 'Войти'}
             </button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <PrivacyTerms 
+        open={showPrivacyTerms} 
+        onOpenChange={setShowPrivacyTerms}
+      />
     </div>
   );
 };

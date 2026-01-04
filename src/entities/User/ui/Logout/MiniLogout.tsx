@@ -11,7 +11,7 @@ const MiniLogout = () => {
     setIsLoggingOut(true);
     try {
       await logout();
-      window.location.href = '/miniphone';
+      window.location.href = '/login';
     } catch (error) {
       console.error('Logout error:', error);
       localStorage.removeItem('auth_token');

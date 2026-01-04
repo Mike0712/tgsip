@@ -1,0 +1,47 @@
+msgid ""
+msgstr ""
+"Language: en\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgid "Loading..."
+msgstr "Loading..."
+
+msgid "Error"
+msgstr "Error"
+
+msgid "Success"
+msgstr "Success"
+
+msgid "Cancel"
+msgstr "Cancel"
+
+msgid "Confirm"
+msgstr "Confirm"
+
+msgid "Close"
+msgstr "Close"
+
+msgid "Checking authentication..."
+msgstr "Checking authentication..."
+
+msgid "Waiting for authentication..."
+msgstr "Waiting for authentication..."
+
+msgid "Confirmed"
+msgstr "Confirmed"
+
+msgid "MiniPhone"
+msgstr "MiniPhone"
+
+msgid "Calls"
+msgstr "Calls"
+
+msgid "General Screen"
+msgstr "General Screen"
+
+msgid "Telegram Web Apps"
+msgstr "Telegram Web Apps"
+
+msgid "Username"
+msgstr "Username"
+

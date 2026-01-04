@@ -11,11 +11,9 @@ const Logout = () => {
     setIsLoggingOut(true);
     try {
       await logout();
-      // Перезагружаем страницу для полного сброса состояния
-      window.location.href = '/miniphone';
+      window.location.href = '/login';
     } catch (error) {
       console.error('Logout error:', error);
-      // Даже если запрос не удался, удаляем токен локально и перезагружаем
       localStorage.removeItem('auth_token');
       window.location.href = '/';
     } finally {
