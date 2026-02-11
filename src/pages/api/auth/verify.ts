@@ -1,5 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import jwt from 'jsonwebtoken';
+import { sessionService } from '@/lib/database';
 
 interface JWTPayload {
   userId: number;
@@ -24,8 +25,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Проверяем JWT токен
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as JWTPayload;
     
-    // Здесь должна быть проверка в базе данных
-    // Пока возвращаем данные из токена
+    // Проверяем сессию в базе данных
+    const session = await sessionService.findByToken(token);
+    if (!session) {
+      return res.status(401).json({
+        success: false,
+        error: 'Session not found or expired',
+        expired: true
+      });
+    }
+    
     res.status(200).json({
       success: true,
       user: {
@@ -37,6 +46,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   } catch (error) {
     if (error instanceof jwt.TokenExpiredError) {
+      // Деактивируем сессию в базе данных при истечении токена
+      const token = req.headers.authorization?.replace('Bearer ', '');
+      if (token) {
+        try {
+          await sessionService.deactivate(token);
+        } catch (deactivateError) {
+          console.error('Failed to deactivate expired session:', deactivateError);
+        }
+      }
+      
       return res.status(401).json({ 
         success: false,
         error: 'Token expired',

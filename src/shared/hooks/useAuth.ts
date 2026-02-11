@@ -10,11 +10,14 @@ export interface User {
   photo_url?: string;
 }
 
+export type AuthErrorReason = 'token_expired' | 'token_invalid' | 'no_token' | null;
+
 interface AuthState {
   user: User | null;
   token: string | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  authErrorReason: AuthErrorReason;
 }
 
 export function useAuth() {
@@ -23,6 +26,7 @@ export function useAuth() {
     token: null,
     isLoading: true,
     isAuthenticated: false,
+    authErrorReason: null,
   });
 
   useEffect(() => {
@@ -30,7 +34,7 @@ export function useAuth() {
       const token = localStorage.getItem('auth_token');
       
       if (!token) {
-        setAuthState(prev => ({ ...prev, isLoading: false }));
+        setAuthState(prev => ({ ...prev, isLoading: false, authErrorReason: 'no_token' }));
         return;
       }
 
@@ -43,23 +47,29 @@ export function useAuth() {
             token,
             isLoading: false,
             isAuthenticated: true,
+            authErrorReason: null,
           });
         } else {
+          // Проверяем, просрочен ли токен
+          const isExpired = response.data?.expired === true;
           localStorage.removeItem('auth_token');
           setAuthState({
             user: null,
             token: null,
             isLoading: false,
             isAuthenticated: false,
+            authErrorReason: isExpired ? 'token_expired' : 'token_invalid',
           });
         }
       } catch (error) {
         console.error('Auth check failed:', error);
+        localStorage.removeItem('auth_token');
         setAuthState({
           user: null,
           token: null,
           isLoading: false,
           isAuthenticated: false,
+          authErrorReason: 'token_invalid',
         });
       }
     };
@@ -84,6 +94,7 @@ export function useAuth() {
             token,
             isLoading: false,
             isAuthenticated: true,
+            authErrorReason: null,
           });
           
           return { success: true, user };
@@ -112,6 +123,7 @@ export function useAuth() {
         token: null,
         isLoading: false,
         isAuthenticated: false,
+        authErrorReason: null,
       });
     }
   }, []);
