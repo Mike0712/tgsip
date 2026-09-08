@@ -1,15 +1,14 @@
 import type { NextApiResponse } from 'next';
 import { withAuth, AuthenticatedRequest } from '@/lib/auth';
 import { userService } from '@/lib/database';
-
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+import { isTelegramConfigured, sendTelegramMessage } from '@/lib/telegram';
 
 const handler = async (req: AuthenticatedRequest, res: NextApiResponse) => {
   if (req.method !== 'POST') {
     return res.status(405).json({ success: false, error: 'Method not allowed' });
   }
 
-  if (!TELEGRAM_BOT_TOKEN) {
+  if (!isTelegramConfigured()) {
     console.error('TELEGRAM_BOT_TOKEN is not configured');
     return res.status(500).json({ success: false, error: 'Bot token not configured' });
   }
@@ -51,27 +50,22 @@ const handler = async (req: AuthenticatedRequest, res: NextApiResponse) => {
       ? message.trim()
       : `${greeting} приглашает вас присоединиться к звонку.`;
 
-    const telegramResponse = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: telegram_id,
-        text: `${fallbackText}\n\n🔗 ${parsedUrl.toString()}`,
-        reply_markup: {
-          inline_keyboard: [[
-            {
-              text: '🚀 Открыть Miniphone',
-              web_app: { url: parsedUrl.toString() }
-            }
-          ]],
-        },
-      }),
+    const telegramResult = await sendTelegramMessage({
+      chat_id: telegram_id,
+      text: `${fallbackText}\n\n🔗 ${parsedUrl.toString()}`,
+      reply_markup: {
+        inline_keyboard: [[
+          {
+            text: '🚀 Открыть Miniphone',
+            web_app: { url: parsedUrl.toString() }
+          }
+        ]],
+      },
     });
 
-    if (!telegramResponse.ok) {
-      const errorData = await telegramResponse.json().catch(() => ({}));
-      console.error('Failed to send invite message via Telegram:', errorData);
-      return res.status(502).json({ success: false, error: 'Failed to send Telegram message', details: errorData });
+    if (!telegramResult.ok) {
+      console.error('Failed to send invite message via Telegram:', telegramResult.status, telegramResult.data);
+      return res.status(502).json({ success: false, error: 'Failed to send Telegram message', details: telegramResult.data });
     }
 
     return res.status(200).json({ success: true });

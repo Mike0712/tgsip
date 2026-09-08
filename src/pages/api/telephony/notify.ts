@@ -1,7 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { userService } from '@/lib/database';
-
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+import { isTelegramConfigured, sendTelegramMessage } from '@/lib/telegram';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -18,11 +17,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    if (!TELEGRAM_BOT_TOKEN) {
+    if (!isTelegramConfigured()) {
       console.error('TELEGRAM_BOT_TOKEN not configured');
-      return res.status(500).json({ 
+      return res.status(500).json({
         success: false,
-        error: 'Bot token not configured' 
+        error: 'Bot token not configured'
       });
     }
 
@@ -49,36 +48,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const callerNumber = from || 'Неизвестный номер';
     const message = `📞 Входящий звонок от ${callerNumber}`;
 
-    // Отправляем уведомление в Telegram
-    const telegramResponse = await fetch(
-      `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: user.telegram_id,
-          text: message,
-          reply_markup: {
-            inline_keyboard: [[
-              { 
-                text: '📞 Ответить', 
-                web_app: { 
-                  url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://your-domain.com'}/miniphone` 
-                } 
-              }
-            ]]
+    // Отправляем уведомление в Telegram (через релей, если задан TELEGRAM_API_BASE)
+    const telegramResult = await sendTelegramMessage({
+      chat_id: user.telegram_id,
+      text: message,
+      reply_markup: {
+        inline_keyboard: [[
+          {
+            text: '📞 Ответить',
+            web_app: {
+              url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://your-domain.com'}/miniphone`
+            }
           }
-        })
+        ]]
       }
-    );
+    });
 
-    if (!telegramResponse.ok) {
-      const errorData = await telegramResponse.json().catch(() => ({}));
-      console.error('Telegram API error:', errorData);
-      return res.status(500).json({ 
+    if (!telegramResult.ok) {
+      console.error('Telegram API error:', telegramResult.status, telegramResult.data);
+      return res.status(502).json({
         success: false,
         error: 'Failed to send Telegram notification',
-        details: errorData
+        details: telegramResult.data
       });
     }
 

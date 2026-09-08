@@ -31,6 +31,10 @@ DB_USER=miniphone_user
 DB_PASSWORD=your_password
 JWT_SECRET=your_super_secret_jwt_key_here
 TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
+# Необязательно: базовый URL Telegram Bot API.
+# Задать, если api.telegram.org недоступен напрямую — указываем релей tgproxy.
+# По умолчанию https://api.telegram.org
+# TELEGRAM_API_BASE=http://10.0.0.5:8080
 ```
 
 ### 3. Запуск миграций
@@ -192,6 +196,8 @@ DB_HOST=your_production_db_host
 DB_NAME=miniphone_prod
 JWT_SECRET=your_production_jwt_secret
 TELEGRAM_BOT_TOKEN=your_production_bot_token
+# Релей для Telegram Bot API (обход блокировки api.telegram.org)
+TELEGRAM_API_BASE=http://10.0.0.5:8080
 ```
 
 ### Команды для деплоя
