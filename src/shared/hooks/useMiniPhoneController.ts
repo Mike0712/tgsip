@@ -39,10 +39,8 @@ export const useMiniPhoneController = (): UseMiniPhoneControllerResult => {
   const searchParams = useSearchParams();
 
   const { user, isAuthenticated, isLoading } = useAuth();
-  let sseItem = null;
-  if (user?.id) {
-    sseItem = useSSE(user.id.toString());
-  }
+  // useSSE must be called unconditionally (rules-of-hooks); it no-ops on an empty id.
+  const sseItem = useSSE(user?.id ? user.id.toString() : '');
 
   const [isClient, setIsClient] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);

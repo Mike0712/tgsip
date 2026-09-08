@@ -4,7 +4,7 @@ import React from 'react';
 import dynamic from 'next/dynamic';
 import { useSelector } from 'react-redux';
 import { RootState } from '@/app/store';
-import { MiniPhoneView, useMiniPhoneController, UseMiniPhoneControllerResult } from '@/shared/hooks/useMiniPhoneController';
+import { MiniPhoneView, useMiniPhoneController } from '@/shared/hooks/useMiniPhoneController';
 import { AlertProvider } from '@/shared/hooks/useAlert';
 import { AlertContainer } from '@/shared/lib/AlertContainer';
 import { BridgeManager } from '@/widgets/BridgeManager';

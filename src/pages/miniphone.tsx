@@ -39,7 +39,7 @@ const MiniPhone = () => {
     return null;
   }
 
-  return <MiniPhoneScreen user={user} />;
+  return <MiniPhoneScreen />;
 };
 
 export default MiniPhone;
