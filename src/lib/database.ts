@@ -425,7 +425,87 @@ export const telephonyService = {
       .join('phones', 'user_phones.phone_id', 'phones.id')
       .where('phones.number', did)
       .first();
-    
+
     return result || null;
   }
+};
+
+export interface PushToken {
+  id: number;
+  user_id: number;
+  fcm_token: string;
+  platform: string;
+  created_at: Date;
+  updated_at: Date;
+}
+
+// Функции для работы с push-токенами мобильного приложения (FCM)
+export const pushTokenService = {
+  async findByUserId(userId: number): Promise<PushToken | null> {
+    return (await db('push_tokens').where('user_id', userId).first()) || null;
+  },
+
+  async upsert(userId: number, fcmToken: string, platform = 'android'): Promise<PushToken> {
+    const existing = await db('push_tokens').where('user_id', userId).first();
+
+    if (existing) {
+      const [updated] = await db('push_tokens')
+        .where('user_id', userId)
+        .update({ fcm_token: fcmToken, platform, updated_at: db.fn.now() })
+        .returning('*');
+      return updated;
+    }
+
+    const [created] = await db('push_tokens')
+      .insert({ user_id: userId, fcm_token: fcmToken, platform })
+      .returning('*');
+    return created;
+  },
+};
+
+export interface LoginCode {
+  id: number;
+  user_id: number;
+  code: string;
+  status: 'pending' | 'used';
+  expires_at: Date;
+  created_at: Date;
+  updated_at: Date;
+}
+
+const LOGIN_CODE_TTL_MS = 5 * 60 * 1000;
+
+function generateLoginCode(): string {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+// Функции для входа мобильного приложения по коду, присылаемому в Telegram
+export const loginCodeService = {
+  async create(userId: number): Promise<LoginCode> {
+    // Инвалидируем прежние неиспользованные коды этого пользователя
+    await db('login_codes').where({ user_id: userId, status: 'pending' }).update({ status: 'used' });
+
+    const [code] = await db('login_codes')
+      .insert({
+        user_id: userId,
+        code: generateLoginCode(),
+        status: 'pending',
+        expires_at: new Date(Date.now() + LOGIN_CODE_TTL_MS),
+      })
+      .returning('*');
+    return code;
+  },
+
+  async findValid(userId: number, code: string): Promise<LoginCode | null> {
+    return (
+      (await db('login_codes')
+        .where({ user_id: userId, code, status: 'pending' })
+        .where('expires_at', '>', db.fn.now())
+        .first()) || null
+    );
+  },
+
+  async markUsed(id: number): Promise<void> {
+    await db('login_codes').where('id', id).update({ status: 'used' });
+  },
 };
