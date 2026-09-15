@@ -1,4 +1,5 @@
 import knex, { Knex } from 'knex';
+import crypto from 'crypto';
 import knexConfig from '../../knexfile';
 
 // Используем глобальный объект для хранения соединения (выживает при hot reload)
@@ -463,49 +464,47 @@ export const pushTokenService = {
   },
 };
 
-export interface LoginCode {
+export interface TelegramLoginRequest {
   id: number;
-  user_id: number;
-  code: string;
-  status: 'pending' | 'used';
+  token: string;
+  status: 'pending' | 'confirmed' | 'not_found' | 'expired';
+  user_id: number | null;
+  jwt_token: string | null;
   expires_at: Date;
   created_at: Date;
   updated_at: Date;
 }
 
-const LOGIN_CODE_TTL_MS = 5 * 60 * 1000;
+const TELEGRAM_LOGIN_TTL_MS = 5 * 60 * 1000;
 
-function generateLoginCode(): string {
-  return String(Math.floor(100000 + Math.random() * 900000));
-}
-
-// Функции для входа мобильного приложения по коду, присылаемому в Telegram
-export const loginCodeService = {
-  async create(userId: number): Promise<LoginCode> {
-    // Инвалидируем прежние неиспользованные коды этого пользователя
-    await db('login_codes').where({ user_id: userId, status: 'pending' }).update({ status: 'used' });
-
-    const [code] = await db('login_codes')
+// Вход мобильного приложения (mobile/) через deep-link в Telegram-бота:
+// start() создаёт pending-запись до того, как мы знаем, кто логинится;
+// bot webhook (/api/telegram/webhook) резолвит telegram_id -> users.id
+// из /start <token> и вызывает confirm()/markNotFound(); мобильное
+// приложение поллит poll.ts по этому же token.
+export const telegramLoginService = {
+  async create(): Promise<TelegramLoginRequest> {
+    const [request] = await db('telegram_login_requests')
       .insert({
-        user_id: userId,
-        code: generateLoginCode(),
+        token: crypto.randomUUID(),
         status: 'pending',
-        expires_at: new Date(Date.now() + LOGIN_CODE_TTL_MS),
+        expires_at: new Date(Date.now() + TELEGRAM_LOGIN_TTL_MS),
       })
       .returning('*');
-    return code;
+    return request;
   },
 
-  async findValid(userId: number, code: string): Promise<LoginCode | null> {
-    return (
-      (await db('login_codes')
-        .where({ user_id: userId, code, status: 'pending' })
-        .where('expires_at', '>', db.fn.now())
-        .first()) || null
-    );
+  async findByToken(token: string): Promise<TelegramLoginRequest | null> {
+    return (await db('telegram_login_requests').where({ token }).first()) || null;
   },
 
-  async markUsed(id: number): Promise<void> {
-    await db('login_codes').where('id', id).update({ status: 'used' });
+  async confirm(token: string, userId: number, jwtToken: string): Promise<void> {
+    await db('telegram_login_requests')
+      .where({ token, status: 'pending' })
+      .update({ status: 'confirmed', user_id: userId, jwt_token: jwtToken });
+  },
+
+  async markNotFound(token: string): Promise<void> {
+    await db('telegram_login_requests').where({ token, status: 'pending' }).update({ status: 'not_found' });
   },
 };

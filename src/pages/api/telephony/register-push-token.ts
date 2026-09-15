@@ -4,8 +4,8 @@ import { withAuth, AuthenticatedRequest } from '@/lib/auth';
 import logger from '../logger';
 
 // Вызывается мобильным приложением (mobile/) при старте и при обновлении
-// FCM-токена, после логина через /api/auth/verify-code — user_id берём из
-// JWT (withAuth), не из тела запроса.
+// FCM-токена, после логина через Telegram deep-link (api/telegram/webhook) —
+// user_id берём из JWT (withAuth), не из тела запроса.
 const handler = async (req: AuthenticatedRequest, res: NextApiResponse) => {
   if (req.method !== 'POST') {
     return res.status(405).json({ success: false, error: 'Method not allowed' });
