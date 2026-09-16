@@ -34,16 +34,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const telegramId = update.message?.from?.id;
   const chatId = update.message?.chat?.id;
 
-  const match = text?.match(/^\/start\s+(\S+)/);
-  if (!match || !telegramId || !chatId) {
-    // Not our /start <token> deep link (some other message/command) — ignore.
+  const isStart = text === '/start' || text?.startsWith('/start ') || text?.startsWith('/start@');
+  if (!isStart || !telegramId || !chatId) {
+    // Not our /start deep link (some other message/command) — ignore.
     return res.status(200).end();
   }
 
-  const loginToken = match[1];
+  const match = text?.match(/^\/start(?:@\S+)?\s+(\S+)/);
+  const loginToken = match?.[1];
 
   try {
-    const request = await telegramLoginService.findByToken(loginToken);
+    // Some Telegram clients drop the ?start= payload for a chat the user
+    // already had open with this bot, sending bare /start instead — fall
+    // back to the latest pending request in that case (see findLatestPending).
+    const request = loginToken
+      ? await telegramLoginService.findByToken(loginToken)
+      : await telegramLoginService.findLatestPending();
     if (!request || request.status !== 'pending' || request.expires_at.getTime() < Date.now()) {
       await sendTelegramMessage({
         chat_id: chatId,
@@ -54,7 +60,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const user = await userService.findByTelegramId(String(telegramId));
     if (!user) {
-      await telegramLoginService.markNotFound(loginToken);
+      await telegramLoginService.markNotFound(request.token);
       await sendTelegramMessage({
         chat_id: chatId,
         text: 'Этот Telegram-аккаунт не зарегистрирован в MiniPhone. Обратитесь к администратору.',
@@ -69,7 +75,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
     await sessionService.create(user.id, jwtToken, expiresAt, 'mobile-telegram-login');
-    await telegramLoginService.confirm(loginToken, user.id, jwtToken);
+    await telegramLoginService.confirm(request.token, user.id, jwtToken);
 
     await sendTelegramMessage({
       chat_id: chatId,

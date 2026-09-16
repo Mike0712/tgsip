@@ -14,13 +14,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (!isTelegramConfigured()) {
     logger.error('[auth/telegram-login/start] TELEGRAM_BOT_TOKEN not configured');
-    return res.status(500).json({ success: false, error: 'Telegram not configured' });
+    return res.status(500).json({ success: false, error: 'TELEGRAM_BOT_TOKEN is not configured on the server' });
   }
 
   const botUsername = process.env.TELEGRAM_BOT_USERNAME;
   if (!botUsername) {
     logger.error('[auth/telegram-login/start] TELEGRAM_BOT_USERNAME not configured');
-    return res.status(500).json({ success: false, error: 'Telegram not configured' });
+    return res.status(500).json({ success: false, error: 'TELEGRAM_BOT_USERNAME is not configured on the server' });
   }
 
   try {

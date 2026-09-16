@@ -498,6 +498,24 @@ export const telegramLoginService = {
     return (await db('telegram_login_requests').where({ token }).first()) || null;
   },
 
+  // Fallback for when Telegram sends a bare /start with no payload — some
+  // clients drop the ?start= deep-link parameter for a chat the user has
+  // already opened with this bot before (undocumented behavior, not just
+  // our bug — see webhook.ts). We can't correlate by token in that case, so
+  // we take the single most recently created still-pending request instead.
+  // This assumes at most one login is in flight at a time; fine for this
+  // app's scale, but a second concurrent login attempt could in principle
+  // steal this confirmation within the ~5min window.
+  async findLatestPending(): Promise<TelegramLoginRequest | null> {
+    return (
+      (await db('telegram_login_requests')
+        .where('status', 'pending')
+        .where('expires_at', '>', db.fn.now())
+        .orderBy('created_at', 'desc')
+        .first()) || null
+    );
+  },
+
   async confirm(token: string, userId: number, jwtToken: string): Promise<void> {
     await db('telegram_login_requests')
       .where({ token, status: 'pending' })
