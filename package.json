@@ -12,7 +12,8 @@
     "test:coverage": "jest --coverage",
     "db:migrate": "knex migrate:latest",
     "db:migrate:rollback": "knex migrate:rollback",
-    "worker:telegram": "tsx src/workers/telegramPoller.ts"
+    "worker:telegram": "tsx src/workers/telegramPoller.ts",
+    "push:test": "tsx src/scripts/send-test-push.ts"
   },
   "dependencies": {
     "@headlessui/react": "^2.1.2",

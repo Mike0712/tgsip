@@ -16,7 +16,11 @@ export function isFirebaseConfigured(): boolean {
   return Boolean(process.env.FIREBASE_SERVICE_ACCOUNT);
 }
 
-function getFirebaseApp(): App {
+// Exported (in addition to sendIncomingCallPush) so diagnostic tooling
+// (src/scripts/send-test-push.ts) can call messaging.send() directly and see
+// the raw Firebase error (.code, .errorInfo) instead of just the flattened
+// .message string sendIncomingCallPush returns to callers.
+export function getFirebaseApp(): App {
   if (app) return app;
 
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
