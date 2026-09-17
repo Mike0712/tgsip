@@ -6,6 +6,7 @@ import {
   updateCallSessionStatus,
   upsertCallSessionParticipant,
 } from '@/lib/callSessions';
+import { createCall, findCallByBridgeId, markCallAnswered, markCallEnded } from '@/lib/calls';
 import { getDb } from '@/lib/db';
 import type { Knex } from 'knex';
 import { sipAccountService } from '@/lib/database';
@@ -53,15 +54,43 @@ const eventsHandler = async (req: AuthenticatedRequest, res: NextApiResponse) =>
     return res.status(400).json({ success: false, error: 'event is required' });
   }
 
+  // Incoming external (PSTN) calls never create a call_sessions row (that
+  // table is only for the conference/invite-link feature) — this is the one
+  // event that starts a `calls` history row from scratch, so it's handled
+  // before the call_sessions lookup below rather than needing a session to
+  // already exist.
+  if (event === 'incoming_call_started') {
+    try {
+      const userId = Number(payload.metadata?.user_id);
+      if (!payload.bridge_id || !payload.caller || !Number.isFinite(userId)) {
+        return res.status(400).json({ success: false, error: 'bridge_id, caller and metadata.user_id are required' });
+      }
+
+      await createCall({
+        userId,
+        bridgeId: payload.bridge_id,
+        fromNumber: payload.caller,
+        sipUser: payload.endpoint,
+      });
+
+      return res.status(200).json({ success: true });
+    } catch (error) {
+      console.error('[telephony/events] Error handling incoming_call_started', error);
+      return res.status(500).json({ success: false, error: 'Internal server error' });
+    }
+  }
+
   let bridgeId = payload.bridge_id;
   let session: any = null;
+  let call: Awaited<ReturnType<typeof findCallByBridgeId>> = null;
 
   try {
     if (bridgeId) {
       session = await findCallSessionByBridge(bridgeId);
+      call = await findCallByBridgeId(bridgeId);
     }
 
-    if (!session) {
+    if (!session && !call) {
       const extensionCandidates = [
         payload.endpoint,
         payload.caller,
@@ -89,9 +118,36 @@ const eventsHandler = async (req: AuthenticatedRequest, res: NextApiResponse) =>
       }
     }
 
-    if (!session) {
+    if (!session && !call) {
       return res.status(404).json({ success: false, error: 'Session not found' });
     }
+
+    if (call) {
+      switch (event) {
+        case 'bridge_join':
+        case 'participant_joined': {
+          // The callee's join is the one whose endpoint is the SIP channel we
+          // originated for them (see asterserver's handleIncomingExternalCall.ts,
+          // which originates `PJSIP/<sip_user>`) — the caller's own join into
+          // the bridge fires this same event but never matches, so it's ignored.
+          if (call.status === 'ringing' && call.sip_user && payload.endpoint?.includes(call.sip_user)) {
+            await markCallAnswered(call.id);
+          }
+          break;
+        }
+
+        case 'bridge_completed':
+        case 'bridge_failed': {
+          await markCallEnded(call.id);
+          break;
+        }
+      }
+    }
+
+    if (!session) {
+      return res.status(200).json({ success: true });
+    }
+
     switch (event) {
       case 'bridge_join':
       case 'participant_joined': {
