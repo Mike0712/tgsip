@@ -69,7 +69,7 @@ const eventsHandler = async (req: AuthenticatedRequest, res: NextApiResponse) =>
       await createCall({
         userId,
         bridgeId: payload.bridge_id,
-        fromNumber: payload.caller,
+        remoteNumber: payload.caller,
         sipUser: payload.endpoint,
       });
 

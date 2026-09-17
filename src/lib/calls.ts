@@ -7,8 +7,8 @@ export interface Call {
   id: number;
   user_id: number;
   direction: CallDirection;
-  bridge_id: string;
-  from_number: string;
+  bridge_id: string | null;
+  remote_number: string;
   sip_user: string | null;
   status: CallStatus;
   started_at: Date;
@@ -22,8 +22,8 @@ export interface Call {
 
 interface CreateCallParams {
   userId: number;
-  bridgeId: string;
-  fromNumber: string;
+  remoteNumber: string;
+  bridgeId?: string | null;
   sipUser?: string | null;
   direction?: CallDirection;
   metadata?: Record<string, unknown>;
@@ -31,8 +31,8 @@ interface CreateCallParams {
 
 export const createCall = async ({
   userId,
-  bridgeId,
-  fromNumber,
+  remoteNumber,
+  bridgeId = null,
   sipUser,
   direction = 'incoming',
   metadata,
@@ -43,7 +43,7 @@ export const createCall = async ({
       user_id: userId,
       direction,
       bridge_id: bridgeId,
-      from_number: fromNumber,
+      remote_number: remoteNumber,
       sip_user: sipUser ?? null,
       status: 'ringing',
       started_at: db.fn.now(),
@@ -56,6 +56,12 @@ export const createCall = async ({
 export const findCallByBridgeId = async (bridgeId: string): Promise<Call | null> => {
   const db = getDb();
   const call = await db('calls').where({ bridge_id: bridgeId }).first();
+  return call || null;
+};
+
+export const findCallById = async (id: number): Promise<Call | null> => {
+  const db = getDb();
+  const call = await db('calls').where({ id }).first();
   return call || null;
 };
 

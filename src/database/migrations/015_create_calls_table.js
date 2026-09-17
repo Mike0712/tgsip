@@ -9,8 +9,13 @@ exports.up = function (knex) {
       .inTable('users')
       .onDelete('CASCADE');
     table.enu('direction', ['incoming', 'outgoing']).notNullable();
-    table.string('bridge_id').notNullable();
-    table.string('from_number').notNullable();
+    // Only set for calls that went through asterserver's ARI/Stasis pipeline
+    // (incoming calls) — outgoing calls are reported directly by the mobile
+    // client (sip.js session state), which never sees an Asterisk bridge id.
+    table.string('bridge_id');
+    // The other party's number — caller for incoming, dialed number for
+    // outgoing (direction tells you which).
+    table.string('remote_number').notNullable();
     table.string('sip_user');
     table
       .enu('status', ['ringing', 'answered', 'missed', 'failed'])
