@@ -67,7 +67,7 @@ async function main() {
   try {
     const messageId = await getMessaging(getFirebaseApp()).send({
       token: token!,
-      data: { type: 'incoming_call', from, ts: String(Date.now()) },
+      data: { type: 'incoming_call', caller: from, ts: String(Date.now()) },
       android: { priority: 'high' },
     });
     console.log('Sent OK, messageId:', messageId);

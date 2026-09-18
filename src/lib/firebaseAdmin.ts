@@ -48,7 +48,11 @@ export async function sendIncomingCallPush(
       token: fcmToken,
       data: {
         type: 'incoming_call',
-        from: data.from,
+        // "from" is a reserved FCM data-payload key (like "to",
+        // "message_type", "collapse_key") — Google's send API rejects it
+        // outright with 400 "Invalid data payload key: from". Renamed to
+        // "caller"; mobile/index.ts and App.tsx read this same key.
+        caller: data.from,
         ts: String(Date.now()),
       },
       android: {
