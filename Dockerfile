@@ -37,6 +37,12 @@ COPY --from=builder /app/next.config.mjs ./next.config.mjs
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/knexfile.js ./knexfile.js
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
+# Конфиги, нужные для `next build` в рантайме (fallback в docker-entrypoint.sh)
+COPY --from=builder /app/tailwind.config.ts ./tailwind.config.ts
+COPY --from=builder /app/postcss.config.mjs ./postcss.config.mjs
+COPY --from=builder /app/.eslintrc.json ./.eslintrc.json
+COPY --from=builder /app/components.json ./components.json
+COPY --from=builder /app/docker-entrypoint.sh ./docker-entrypoint.sh
 # Полный src/ (не только migrations) — нужен src/workers/telegramPoller.ts,
 # который запускается тут же через tsx, а не как часть next start.
 COPY --from=builder /app/src ./src
@@ -44,5 +50,5 @@ COPY --from=builder /app/src ./src
 COPY --from=builder /app/node_modules ./node_modules
 EXPOSE 3000
 ENV NODE_ENV=production
-ENTRYPOINT ["/usr/bin/tini", "--"]
+ENTRYPOINT ["/usr/bin/tini", "--", "/app/docker-entrypoint.sh"]
 CMD ["node", "node_modules/next/dist/bin/next", "start", "-p", "3000"]
