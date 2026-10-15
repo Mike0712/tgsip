@@ -1,6 +1,6 @@
 import { UserAgent, UserAgentOptions, Registerer, RegistererState, Inviter, Invitation, URI, Session, SessionState } from 'sip.js';
 import store, { RootState } from '@/app/store';
-import { setStatus, setInvite, setAnswer, setHangup } from '../model/slice';
+import { setStatus, setInvite, setAnswer, setHangup, setSessionState } from '../model/slice';
 
 class SipService {
   private userAgent: UserAgent | null = null;
@@ -19,7 +19,23 @@ class SipService {
       authorizationPassword: this.password,
       delegate: {
         onInvite: (invitation) => {
+          // Уже есть активный/звонящий вызов — отвечаем 486 Busy Here и не трогаем текущую сессию
+          if (this.session instanceof Session && this.session.state !== SessionState.Terminated) {
+            console.warn('📵 Incoming call rejected: line is busy');
+            invitation.reject({ statusCode: 486, reasonPhrase: 'Busy Here' }).catch(console.error);
+            return;
+          }
           this.session = invitation;
+          invitation.stateChange.addListener((state: SessionState) => {
+            // Игнорируем события устаревших сессий
+            if (this.session !== invitation) return;
+            store.dispatch(setSessionState(state));
+            this.listenSessionState(state);
+            // Звонок принят, отменён звонящим или завершён — рингтон больше не нужен
+            if (state === SessionState.Established || state === SessionState.Terminated) {
+              store.dispatch(setInvite(false));
+            }
+          });
           store.dispatch(setInvite(true));
         },
         onConnect: () => {
@@ -200,9 +216,6 @@ class SipService {
   }
   answer() {
     if (this.session instanceof Invitation) {
-      this.session.stateChange.addListener((state: string) => {
-        this.listenSessionState(state);
-      });
       this.session.accept();
       store.dispatch(setAnswer(false));
     }
