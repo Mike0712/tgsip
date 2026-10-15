@@ -36,7 +36,10 @@ COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/next.config.mjs ./next.config.mjs
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/knexfile.js ./knexfile.js
-COPY --from=builder /app/src/database/migrations ./src/database/migrations
+COPY --from=builder /app/tsconfig.json ./tsconfig.json
+# Полный src/ (не только migrations) — нужен src/workers/telegramPoller.ts,
+# который запускается тут же через tsx, а не как часть next start.
+COPY --from=builder /app/src ./src
 # Копируем только production node_modules (быстрее чем переустановка)
 COPY --from=builder /app/node_modules ./node_modules
 EXPOSE 3000

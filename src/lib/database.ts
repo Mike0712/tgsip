@@ -1,4 +1,5 @@
 import knex, { Knex } from 'knex';
+import crypto from 'crypto';
 import knexConfig from '../../knexfile';
 
 // Используем глобальный объект для хранения соединения (выживает при hot reload)
@@ -425,7 +426,103 @@ export const telephonyService = {
       .join('phones', 'user_phones.phone_id', 'phones.id')
       .where('phones.number', did)
       .first();
-    
+
     return result || null;
   }
+};
+
+export interface PushToken {
+  id: number;
+  user_id: number;
+  fcm_token: string;
+  platform: string;
+  created_at: Date;
+  updated_at: Date;
+}
+
+// Функции для работы с push-токенами мобильного приложения (FCM)
+export const pushTokenService = {
+  async findByUserId(userId: number): Promise<PushToken | null> {
+    return (await db('push_tokens').where('user_id', userId).first()) || null;
+  },
+
+  async upsert(userId: number, fcmToken: string, platform = 'android'): Promise<PushToken> {
+    const existing = await db('push_tokens').where('user_id', userId).first();
+
+    if (existing) {
+      const [updated] = await db('push_tokens')
+        .where('user_id', userId)
+        .update({ fcm_token: fcmToken, platform, updated_at: db.fn.now() })
+        .returning('*');
+      return updated;
+    }
+
+    const [created] = await db('push_tokens')
+      .insert({ user_id: userId, fcm_token: fcmToken, platform })
+      .returning('*');
+    return created;
+  },
+};
+
+export interface TelegramLoginRequest {
+  id: number;
+  token: string;
+  status: 'pending' | 'confirmed' | 'not_found' | 'expired';
+  user_id: number | null;
+  jwt_token: string | null;
+  expires_at: Date;
+  created_at: Date;
+  updated_at: Date;
+}
+
+const TELEGRAM_LOGIN_TTL_MS = 5 * 60 * 1000;
+
+// Вход мобильного приложения (mobile/) через deep-link в Telegram-бота:
+// start() создаёт pending-запись до того, как мы знаем, кто логинится;
+// bot webhook (/api/telegram/webhook) резолвит telegram_id -> users.id
+// из /start <token> и вызывает confirm()/markNotFound(); мобильное
+// приложение поллит poll.ts по этому же token.
+export const telegramLoginService = {
+  async create(): Promise<TelegramLoginRequest> {
+    const [request] = await db('telegram_login_requests')
+      .insert({
+        token: crypto.randomUUID(),
+        status: 'pending',
+        expires_at: new Date(Date.now() + TELEGRAM_LOGIN_TTL_MS),
+      })
+      .returning('*');
+    return request;
+  },
+
+  async findByToken(token: string): Promise<TelegramLoginRequest | null> {
+    return (await db('telegram_login_requests').where({ token }).first()) || null;
+  },
+
+  // Fallback for when Telegram sends a bare /start with no payload — some
+  // clients drop the ?start= deep-link parameter for a chat the user has
+  // already opened with this bot before (undocumented behavior, not just
+  // our bug — see webhook.ts). We can't correlate by token in that case, so
+  // we take the single most recently created still-pending request instead.
+  // This assumes at most one login is in flight at a time; fine for this
+  // app's scale, but a second concurrent login attempt could in principle
+  // steal this confirmation within the ~5min window.
+  async findLatestPending(): Promise<TelegramLoginRequest | null> {
+    return (
+      (await db('telegram_login_requests')
+        .where('status', 'pending')
+        .where('expires_at', '>', db.fn.now())
+        .orderBy('created_at', 'desc')
+        .first()) || null
+    );
+  },
+
+  async confirm(token: string, userId: number, jwtToken: string): Promise<void> {
+    await db('telegram_login_requests')
+      .where({ token, status: 'pending' })
+      .update({ status: 'confirmed', user_id: userId, jwt_token: jwtToken });
+  },
+
+  async markNotFound(token: string): Promise<void> {
+    await db('telegram_login_requests').where({ token, status: 'pending' }).update({ status: 'not_found' });
+  },
 };

@@ -35,7 +35,17 @@ TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
 # Задать, если api.telegram.org недоступен напрямую — указываем релей tgproxy.
 # По умолчанию https://api.telegram.org
 # TELEGRAM_API_BASE=http://10.0.0.5:8080
+
+# Побудка мобильного приложения (mobile/) из killed-состояния через FCM —
+# см. /api/telephony/wake-push и /api/telephony/register-push-token
+# Сервис-аккаунт из Firebase Console → Project settings → Service accounts,
+# весь JSON-ключ одной строкой.
+FIREBASE_SERVICE_ACCOUNT={"type":"service_account",...}
 ```
+
+Мобильное приложение авторизуется тем же JWT, что и web miniapp — логин по
+коду, присланному в Telegram (см. `/api/auth/request-code` и
+`/api/auth/verify-code`), отдельного секрета не требуется.
 
 ### 3. Запуск миграций
 
