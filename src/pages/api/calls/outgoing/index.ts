@@ -11,7 +11,10 @@ const handler = async (req: AuthenticatedRequest, res: NextApiResponse) => {
   }
 
   try {
-    const { to_number: toNumber } = (req.body || {}) as { to_number?: string };
+    const { to_number: toNumber, caller_id: callerId } = (req.body || {}) as {
+      to_number?: string;
+      caller_id?: string | null;
+    };
     if (!toNumber || typeof toNumber !== 'string') {
       return res.status(400).json({ success: false, error: 'to_number is required' });
     }
@@ -19,6 +22,7 @@ const handler = async (req: AuthenticatedRequest, res: NextApiResponse) => {
     const call = await createCall({
       userId: req.user.userId,
       remoteNumber: toNumber,
+      localNumber: typeof callerId === 'string' && callerId.trim() ? callerId.trim() : null,
       direction: 'outgoing',
     });
 
