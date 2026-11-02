@@ -70,6 +70,7 @@ const eventsHandler = async (req: AuthenticatedRequest, res: NextApiResponse) =>
         userId,
         bridgeId: payload.bridge_id,
         remoteNumber: payload.caller,
+        localNumber: typeof payload.called === 'string' && payload.called.trim() ? payload.called.trim() : null,
         sipUser: payload.endpoint,
       });
 

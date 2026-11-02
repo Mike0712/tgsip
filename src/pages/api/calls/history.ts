@@ -22,6 +22,7 @@ const handler = async (req: AuthenticatedRequest, res: NextApiResponse) => {
         id: call.id,
         direction: call.direction,
         remote_number: call.remote_number,
+        local_number: call.local_number,
         status: call.status,
         started_at: call.started_at,
         answered_at: call.answered_at,

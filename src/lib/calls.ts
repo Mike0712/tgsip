@@ -9,6 +9,8 @@ export interface Call {
   direction: CallDirection;
   bridge_id: string | null;
   remote_number: string;
+  // Our side: dialed DID for incoming, presented Caller ID for outgoing.
+  local_number: string | null;
   sip_user: string | null;
   status: CallStatus;
   started_at: Date;
@@ -23,6 +25,7 @@ export interface Call {
 interface CreateCallParams {
   userId: number;
   remoteNumber: string;
+  localNumber?: string | null;
   bridgeId?: string | null;
   sipUser?: string | null;
   direction?: CallDirection;
@@ -32,6 +35,7 @@ interface CreateCallParams {
 export const createCall = async ({
   userId,
   remoteNumber,
+  localNumber = null,
   bridgeId = null,
   sipUser,
   direction = 'incoming',
@@ -44,6 +48,7 @@ export const createCall = async ({
       direction,
       bridge_id: bridgeId,
       remote_number: remoteNumber,
+      local_number: localNumber,
       sip_user: sipUser ?? null,
       status: 'ringing',
       started_at: db.fn.now(),
