@@ -1,5 +1,6 @@
 import { UserAgent, UserAgentOptions, Registerer, RegistererState, Inviter, Invitation, URI, Session, SessionState } from 'sip.js';
 import store, { RootState } from '@/app/store';
+import { apiClient } from '@/lib/api';
 import { setStatus, setInvite, setAnswer, setHangup, setSessionState } from '../model/slice';
 
 class SipService {
@@ -134,8 +135,18 @@ class SipService {
           extraHeaders
         });
         if (this.session instanceof Session) {
+          // Conference dial-ins (bridge-manager.tsx) also go through here,
+          // tagged with X-bridgeId — those are tracked in call_sessions, not
+          // in the personal call history.
+          const isBridgeDial = extraHeaders.some((h) => h.startsWith('X-bridgeId:'));
+          const callReport = isBridgeDial ? null : this.reportOutgoingCallStarted(phone, callerId);
+
           this.session.stateChange.addListener((state: string) => {
             this.listenSessionState(state);
+            if (callReport) {
+              if (state === SessionState.Established) this.reportOutgoingCallEvent(callReport, 'answered');
+              if (state === SessionState.Terminated) this.reportOutgoingCallEvent(callReport, 'ended');
+            }
             listener(state);
           });
           this.session.invite();
@@ -329,6 +340,33 @@ class SipService {
           }, { once: true });
         });
     }
+  }
+
+  // Best-effort — a failed report must never block the actual call.
+  private reportOutgoingCallStarted(phone: string, callerId?: string | null): Promise<number | null> {
+    return apiClient
+      .reportOutgoingCallStarted(phone, callerId)
+      .then((res) => {
+        const id = res.data?.call?.id;
+        if (!res.success || typeof id !== 'number') {
+          console.warn('⚠️ Failed to report outgoing call start:', res.error);
+          return null;
+        }
+        return id;
+      })
+      .catch((error) => {
+        console.warn('⚠️ Failed to report outgoing call start:', error);
+        return null;
+      });
+  }
+
+  private reportOutgoingCallEvent(callReport: Promise<number | null>, event: 'answered' | 'ended') {
+    callReport
+      .then((id) => (id === null ? undefined : apiClient.reportOutgoingCallEvent(id, event)))
+      .then((res) => {
+        if (res && !res.success) console.warn(`⚠️ Failed to report outgoing call ${event}:`, res.error);
+      })
+      .catch((error) => console.warn(`⚠️ Failed to report outgoing call ${event}:`, error));
   }
 
   private listenSessionState(state: string) {

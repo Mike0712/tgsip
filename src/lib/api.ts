@@ -504,6 +504,29 @@ class ApiClient {
       method: 'DELETE',
     });
   }
+
+  // Outgoing calls go straight from sip.js to Asterisk's dialplan and never
+  // enter the ARI/Stasis pipeline, so nothing server-side records them —
+  // the client self-reports the lifecycle (same as the mobile app does).
+  async reportOutgoingCallStarted(
+    toNumber: string,
+    callerId?: string | null,
+  ): Promise<ApiResponse<{ success: boolean; call?: { id: number } }>> {
+    return this.request<{ success: boolean; call?: { id: number } }>('/calls/outgoing', {
+      method: 'POST',
+      body: JSON.stringify({ to_number: toNumber, caller_id: callerId ?? null }),
+    });
+  }
+
+  async reportOutgoingCallEvent(
+    callId: number,
+    event: 'answered' | 'ended',
+  ): Promise<ApiResponse<{ success: boolean }>> {
+    return this.request<{ success: boolean }>(`/calls/outgoing/${callId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ event }),
+    });
+  }
 }
 
 export const apiClient = new ApiClient();
