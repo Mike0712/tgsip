@@ -30,6 +30,11 @@ WORKDIR /app
 RUN apt-get update && \
     apt-get install -y --no-install-recommends tini && \
     rm -rf /var/lib/apt/lists/*
+# node_modules (~160 MB) идёт первым и берётся из deps, а не из builder:
+# слой кешируется, пока не изменился package-lock.json. Раньше он стоял
+# последним — любое изменение src/ инвалидировало его, и он заново
+# копировался и экспортировался при каждом деплое (~5 мин).
+COPY --from=deps /app/node_modules ./node_modules
 # Копируем только нужные файлы (оптимизируем порядок для кеша)
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/.next ./.next
@@ -46,8 +51,6 @@ COPY --from=builder /app/docker-entrypoint.sh ./docker-entrypoint.sh
 # Полный src/ (не только migrations) — нужен src/workers/telegramPoller.ts,
 # который запускается тут же через tsx, а не как часть next start.
 COPY --from=builder /app/src ./src
-# Копируем только production node_modules (быстрее чем переустановка)
-COPY --from=builder /app/node_modules ./node_modules
 EXPOSE 3000
 ENV NODE_ENV=production
 ENTRYPOINT ["/usr/bin/tini", "--", "/app/docker-entrypoint.sh"]

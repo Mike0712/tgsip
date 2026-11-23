@@ -36,6 +36,9 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
           port: ${{ secrets.SSH_PORT || 22 }}
+          # По умолчанию 10m — next build + экспорт образа на сервере в него не укладываются,
+          # и сессия рвётся до `docker compose up` (образ собран, контейнер старый).
+          command_timeout: 30m
           script: |
             cd ${{ secrets.PROJECT_DIR }}/tgsip
             # Обновляем код из репозитория
