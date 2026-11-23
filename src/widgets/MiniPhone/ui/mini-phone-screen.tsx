@@ -11,8 +11,6 @@ import { BridgeManager } from '@/widgets/BridgeManager';
 import StatusPanel from '@/entities/WebRtc/ui/Connection/StatusPanel';
 import MiniLogout from '@/entities/User/ui/Logout/MiniLogout';
 import { useTranslation } from '@/shared/hooks/useTranslation';
-import store from '@/app/store';
-import { setDialerPrefill } from '@/entities/WebRtc/model/slice';
 
 const connectingSessionStates = new Set(['Establishing', 'Established']);
 const connectingInviteStates = new Set(['creating', 'waiting', 'connecting', 'ready', 'active']);
@@ -24,11 +22,6 @@ const DialerLoading = () => {
   return <div className="bg-white rounded-2xl shadow-lg p-6 text-center">{t('Loading...')}</div>;
 };
 
-const CallHistory = dynamic(() => import('@/widgets/CallHistory/call-history'), {
-  ssr: false,
-  loading: () => <DialerLoading />,
-});
-
 const DialerTelegram = dynamic(() => import('@/widgets/Dialer/dialer-telegram'), {
   ssr: false,
   loading: () => <DialerLoading />,
@@ -37,11 +30,9 @@ const DialerTelegram = dynamic(() => import('@/widgets/Dialer/dialer-telegram'),
 interface ViewSwitcherProps {
   activeView: MiniPhoneView;
   onChange: (view: MiniPhoneView) => void;
-  /** History is only meaningful with a phone number (same condition as the dialer). */
-  showHistory?: boolean;
 }
 
-export const ViewSwitcher: React.FC<ViewSwitcherProps> = ({ activeView, onChange, showHistory = false }) => {
+export const ViewSwitcher: React.FC<ViewSwitcherProps> = ({ activeView, onChange }) => {
   const t = useTranslation();
   
   return (
@@ -57,19 +48,6 @@ export const ViewSwitcher: React.FC<ViewSwitcherProps> = ({ activeView, onChange
       >
         📞 {t('Calls')}
       </button>
-      {showHistory && (
-        <button
-          type="button"
-          onClick={() => onChange('history')}
-          className={`ml-1 flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-            activeView === 'history'
-              ? 'bg-blue-600 text-white shadow'
-              : 'text-gray-600 hover:bg-gray-100'
-          }`}
-        >
-          🕘 {t('History')}
-        </button>
-      )}
       <button
         type="button"
         onClick={() => onChange('general')}
@@ -92,14 +70,6 @@ export const ViewSwitcher: React.FC<ViewSwitcherProps> = ({ activeView, onChange
   const inviteStatus = useSelector((state: RootState) => state.sip.inviteStatus);
   const callStatus = useSelector((state: RootState) => state.sip.callStatus);
   const bridgeStatus = useSelector((state: RootState) => state.sip.bridgeStatus);
-  const invite = useSelector((state: RootState) => state.sip.invite);
-
-  // The ringtone and answer button live in the dialer (Handset) — don't let an
-  // incoming call ring silently while the history tab is open.
-  const { activeView, setActiveView } = controller;
-  React.useEffect(() => {
-    if (invite && activeView === 'history') setActiveView('dialer');
-  }, [invite, activeView, setActiveView]);
 
   const shouldShowAudioButton =
     connectingSessionStates.has(sessionState) ||
@@ -138,21 +108,12 @@ export const ViewSwitcher: React.FC<ViewSwitcherProps> = ({ activeView, onChange
           </div>
           
           {controller.canUseDialer && (
-            <ViewSwitcher activeView={controller.activeView} onChange={controller.setActiveView} showHistory />
+            <ViewSwitcher activeView={controller.activeView} onChange={controller.setActiveView} />
           )}
 
           {controller.showGeneralScreen && <BridgeManager />}
 
           {controller.showDialer && <DialerTelegram />}
-
-          {controller.showHistory && (
-            <CallHistory
-              onSelectNumber={(number) => {
-                store.dispatch(setDialerPrefill(number));
-                controller.setActiveView('dialer');
-              }}
-            />
-          )}
 
           <div className="mt-6 text-center">
             <p className="text-xs text-gray-500">{t('Telegram Web Apps')}</p>
