@@ -41,9 +41,11 @@ const RELOAD_AFTER_CALL_MS = 1500;
 interface CallHistoryProps {
   /** Tapped row's number — the parent switches to the dialer with it pre-filled. */
   onSelectNumber?: (number: string) => void;
+  /** "←" button: back to the dialer. */
+  onBack?: () => void;
 }
 
-const CallHistory: React.FC<CallHistoryProps> = ({ onSelectNumber }) => {
+const CallHistory: React.FC<CallHistoryProps> = ({ onSelectNumber, onBack }) => {
   const [calls, setCalls] = useState<CallHistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -82,9 +84,19 @@ const CallHistory: React.FC<CallHistoryProps> = ({ onSelectNumber }) => {
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-lg p-4">
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-lg font-semibold text-gray-800">История звонков</h2>
+    <div>
+      <div className="flex items-center gap-2 mb-3">
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            className="-ml-2 rounded-md px-2 py-1 text-xl leading-none text-gray-700 hover:bg-gray-100"
+            aria-label="Назад к набору номера"
+          >
+            ←
+          </button>
+        )}
+        <h2 className="flex-1 text-lg font-semibold text-gray-800">История звонков</h2>
         <button
           type="button"
           onClick={onRefresh}
