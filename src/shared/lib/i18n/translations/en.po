@@ -36,6 +36,9 @@ msgstr "MiniPhone"
 msgid "Calls"
 msgstr "Calls"
 
+msgid "History"
+msgstr "History"
+
 msgid "General Screen"
 msgstr "General Screen"
 

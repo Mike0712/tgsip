@@ -16,7 +16,7 @@ import {
 } from '@/entities/WebRtc/model/slice';
 import { getSipServiceInstance } from '@/entities/WebRtc/services/sipServiceInstance';
 
-export type MiniPhoneView = 'general' | 'dialer';
+export type MiniPhoneView = 'general' | 'dialer' | 'history';
 
 interface UseMiniPhoneControllerResult {
   isLoadingAuth: boolean;
@@ -32,6 +32,7 @@ interface UseMiniPhoneControllerResult {
   canUseDialer: boolean;
   showDialer: boolean;
   showGeneralScreen: boolean;
+  showHistory: boolean;
 }
 
 export const useMiniPhoneController = (): UseMiniPhoneControllerResult => {
@@ -68,7 +69,7 @@ export const useMiniPhoneController = (): UseMiniPhoneControllerResult => {
       setActiveViewState('dialer');
     }
 
-    if (!hasPhones && activeView === 'dialer') {
+    if (!hasPhones && (activeView === 'dialer' || activeView === 'history')) {
       setActiveViewState('general');
     }
   }, [hasPhones, viewLocked, activeView]);
@@ -262,6 +263,7 @@ export const useMiniPhoneController = (): UseMiniPhoneControllerResult => {
   }, []);
 
   const showDialer = activeView === 'dialer' && hasPhones;
+  const showHistory = activeView === 'history' && hasPhones;
   const showGeneralScreen = activeView === 'general' || !hasPhones;
 
   return useMemo(
@@ -279,6 +281,7 @@ export const useMiniPhoneController = (): UseMiniPhoneControllerResult => {
       canUseDialer: hasPhones,
       showDialer,
       showGeneralScreen,
+      showHistory,
     }),
     [
       activeView,
@@ -292,6 +295,7 @@ export const useMiniPhoneController = (): UseMiniPhoneControllerResult => {
       setActiveView,
       showDialer,
       showGeneralScreen,
+      showHistory,
       user,
     ],
   );

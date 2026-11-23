@@ -30,6 +30,89 @@ export function getSSE(user_id: string) {
   return sources[user_id];
 }
 
+/** The already-open SSE stream, for non-React code (e.g. sipService). */
+export function getActiveSSE(): EventSource | null {
+  return Object.values(sources)[0] ?? null;
+}
+
+// subscribe/unsubscribe don't depend on user_id — exported standalone so
+// services can use them too; useSSE() still returns them for components.
+export async function subscribe(event: string | string[], event_id: string) {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+  if (!token) {
+    console.error('[SSE] No auth token found for subscribe');
+    return;
+  }
+
+  const sseServerUrl = process.env.NEXT_PUBLIC_SSE_SERVER_URL;
+  if (!sseServerUrl) {
+    console.error('[SSE] NEXT_PUBLIC_SSE_SERVER_URL is not configured');
+    return;
+  }
+
+  try {
+    const response = await fetch(`${sseServerUrl}/subscribe`, {
+      method: "POST",
+      headers: { 
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify({ event, event_id }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => 'Unknown error');
+      console.error(`[SSE] Subscribe failed: ${response.status} ${response.statusText}`, errorText);
+      return;
+    }
+
+    console.log(`[SSE] Successfully subscribed to event: ${event}, event_id: ${event_id}`);
+  } catch (error) {
+    console.error('[SSE] Subscribe request failed:', error);
+    if (error instanceof TypeError && error.message === 'Failed to fetch') {
+      console.error(`[SSE] Cannot connect to SSE server at ${sseServerUrl}. Check if server is running and CORS is configured.`);
+    }
+  }
+}
+export async function unsubscribe(event: string | string[], event_id: string) {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+  if (!token) {
+    console.error('[SSE] No auth token found for unsubscribe');
+    return;
+  }
+
+  const sseServerUrl = process.env.NEXT_PUBLIC_SSE_SERVER_URL;
+  if (!sseServerUrl) {
+    console.error('[SSE] NEXT_PUBLIC_SSE_SERVER_URL is not configured');
+    return;
+  }
+
+  try {
+    const response = await fetch(`${sseServerUrl}/unsubscribe`, {
+      method: "POST",
+      headers: { 
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify({ event, event_id }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => 'Unknown error');
+      console.error(`[SSE] Unsubscribe failed: ${response.status} ${response.statusText}`, errorText);
+      return;
+    }
+
+    console.log(`[SSE] Successfully unsubscribed from event: ${event}, event_id: ${event_id}`);
+  } catch (error) {
+    console.error('[SSE] Unsubscribe request failed:', error);
+    if (error instanceof TypeError && error.message === 'Failed to fetch') {
+      console.error(`[SSE] Cannot connect to SSE server at ${sseServerUrl}. Check if server is running and CORS is configured.`);
+    }
+  }
+}
+
+
 export function useSSE(user_id: string) {
   const es = getSSE(user_id);
 
@@ -44,81 +127,6 @@ export function useSSE(user_id: string) {
     if (!es) return;
     listeners[user_id][event]?.delete(handler);
     es.removeEventListener(event, handler);
-  }
-
-  async function subscribe(event: string | string[], event_id: string) {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-    if (!token) {
-      console.error('[SSE] No auth token found for subscribe');
-      return;
-    }
-
-    const sseServerUrl = process.env.NEXT_PUBLIC_SSE_SERVER_URL;
-    if (!sseServerUrl) {
-      console.error('[SSE] NEXT_PUBLIC_SSE_SERVER_URL is not configured');
-      return;
-    }
-
-    try {
-      const response = await fetch(`${sseServerUrl}/subscribe`, {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({ event, event_id }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => 'Unknown error');
-        console.error(`[SSE] Subscribe failed: ${response.status} ${response.statusText}`, errorText);
-        return;
-      }
-
-      console.log(`[SSE] Successfully subscribed to event: ${event}, event_id: ${event_id}`);
-    } catch (error) {
-      console.error('[SSE] Subscribe request failed:', error);
-      if (error instanceof TypeError && error.message === 'Failed to fetch') {
-        console.error(`[SSE] Cannot connect to SSE server at ${sseServerUrl}. Check if server is running and CORS is configured.`);
-      }
-    }
-  }
-  async function unsubscribe(event: string | string[], event_id: string) {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-    if (!token) {
-      console.error('[SSE] No auth token found for unsubscribe');
-      return;
-    }
-
-    const sseServerUrl = process.env.NEXT_PUBLIC_SSE_SERVER_URL;
-    if (!sseServerUrl) {
-      console.error('[SSE] NEXT_PUBLIC_SSE_SERVER_URL is not configured');
-      return;
-    }
-
-    try {
-      const response = await fetch(`${sseServerUrl}/unsubscribe`, {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({ event, event_id }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => 'Unknown error');
-        console.error(`[SSE] Unsubscribe failed: ${response.status} ${response.statusText}`, errorText);
-        return;
-      }
-
-      console.log(`[SSE] Successfully unsubscribed from event: ${event}, event_id: ${event_id}`);
-    } catch (error) {
-      console.error('[SSE] Unsubscribe request failed:', error);
-      if (error instanceof TypeError && error.message === 'Failed to fetch') {
-        console.error(`[SSE] Cannot connect to SSE server at ${sseServerUrl}. Check if server is running and CORS is configured.`);
-      }
-    }
   }
 
   return { eventSource: es, on, off, subscribe, unsubscribe };

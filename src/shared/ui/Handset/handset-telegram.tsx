@@ -3,10 +3,12 @@ import cls from "./handset.module.css";
 import { PhoneIcon, XIcon } from "@heroicons/react/solid";
 import { useSelector } from 'react-redux';
 import store, { RootState } from "@/app/store";
-import { setAnswer, setInvite, setHangup, setSelectedCallerId as setReduxCallerId } from '@/entities/WebRtc/model/slice';
+import { setAnswer, setInvite, setHangup, setSelectedCallerId as setReduxCallerId, setDialerPrefill } from '@/entities/WebRtc/model/slice';
 import DtmfPad from "@/entities/WebRtc/ui/DtmfPad/dtmf-pad";
 import { getSipServiceInstance } from "@/entities/WebRtc/services/sipServiceInstance";
 import { UserPhone } from "@/lib/api";
+import { outgoingCallDetails, outgoingCallLabel } from "@/entities/WebRtc/model/outgoingCall";
+import { unlockTones } from "@/entities/WebRtc/services/callTones";
 
 interface HandsetProps {
   onCall: (dialingNumber: string) => void
@@ -21,6 +23,16 @@ const Handset = (props: HandsetProps) => {
   const [isClient, setIsClient] = useState(false);
   const [selectedCallerId, setSelectedCallerId] = useState<UserPhone | null>(null);
   const digits = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "*", "0", "#"];
+  const outgoingCall = useSelector((state: RootState) => state.sip.outgoingCall);
+  const dialerPrefill = useSelector((state: RootState) => state.sip.dialerPrefill);
+
+  // Number tapped in the call history tab
+  useEffect(() => {
+    if (dialerPrefill) {
+      setDialingNumber(dialerPrefill);
+      store.dispatch(setDialerPrefill(null));
+    }
+  }, [dialerPrefill]);
 
   // Предотвращаем ошибку гидратации
   useEffect(() => {
@@ -110,6 +122,8 @@ const Handset = (props: HandsetProps) => {
 
   const handleCall = useCallback(() => {
     if (dialingNumber.trim()) {
+      // Call/busy tones are WebAudio — the context may only start inside a tap.
+      unlockTones();
       // Сохраняем выбранный caller ID в Redux
       store.dispatch(setReduxCallerId(selectedCallerId?.phone_number || null));
       
@@ -188,6 +202,21 @@ const Handset = (props: HandsetProps) => {
             <p className="text-xs text-gray-500 mt-1">
               Выбран: {selectedCallerId.phone_number}
             </p>
+          )}
+        </div>
+      )}
+
+      {outgoingCall && (
+        <div
+          className={`mb-3 rounded-lg px-3 py-2 text-center ${
+            outgoingCall.phase === 'ended' ? 'bg-red-50 text-red-700' : 'bg-blue-50 text-blue-700'
+          }`}
+          role="status"
+          aria-live="polite"
+        >
+          <p className="text-sm font-medium">{outgoingCallLabel(outgoingCall)}</p>
+          {outgoingCallDetails(outgoingCall) && (
+            <p className="text-xs opacity-70 mt-0.5">{outgoingCallDetails(outgoingCall)}</p>
           )}
         </div>
       )}

@@ -1,3 +1,17 @@
+// Mirrors GET /api/calls/history (pages/api/calls/history.ts).
+interface CallHistoryEntry {
+  id: number;
+  direction: 'incoming' | 'outgoing';
+  remote_number: string;
+  /** Our side: dialed DID for incoming, presented Caller ID for outgoing. */
+  local_number: string | null;
+  status: 'ringing' | 'answered' | 'missed' | 'failed';
+  started_at: string;
+  answered_at: string | null;
+  ended_at: string | null;
+  duration_seconds: number | null;
+}
+
 interface ApiResponse<T> {
   success: boolean;
   data?: T;
@@ -518,6 +532,12 @@ class ApiClient {
     });
   }
 
+  async getCallHistory(limit = 50, offset = 0): Promise<ApiResponse<{ success: boolean; calls?: CallHistoryEntry[]; error?: string }>> {
+    return this.request<{ success: boolean; calls?: CallHistoryEntry[]; error?: string }>(
+      `/calls/history?limit=${limit}&offset=${offset}`,
+    );
+  }
+
   async reportOutgoingCallEvent(
     callId: number,
     event: 'answered' | 'ended',
@@ -550,4 +570,5 @@ export type {
   BridgeCreateResponse,
   CallSessionRecord,
   CallSessionParticipantRecord,
+  CallHistoryEntry,
 };
