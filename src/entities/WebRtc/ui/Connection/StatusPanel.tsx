@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 import store, { RootState } from "@/app/store";
 import SipService from '../../services/sipService';
-import { setSessionState, setToggleMute } from '@/entities/WebRtc/model/slice';
+import { setSessionState, setToggleMute, setManualCall } from '@/entities/WebRtc/model/slice';
 import { setSipServiceInstance, getSipServiceInstance } from '../../services/sipServiceInstance';
 import { WakeLockManager } from '@/shared/ui/WakeLockManager/wake-lock-manager';
 import cls from './status-panel.module.css';
@@ -44,8 +44,12 @@ const StatusPanel = () => {
     if (manualCall) {
       const phoneNumber = manualCall;
       sipService && sipService.makeCall(phoneNumber, stateListener, selectedCallerId);
+      // One-shot trigger: reset so calling the same number again (e.g. after
+      // "Занято") changes the value and re-runs this effect.
+      store.dispatch(setManualCall(false));
     }
-  }, [manualCall, selectedCallerId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [manualCall]);
 
   useEffect(() => {
     if (answer) {

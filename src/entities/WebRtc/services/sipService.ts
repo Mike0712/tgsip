@@ -2,6 +2,7 @@ import { UserAgent, UserAgentOptions, Registerer, RegistererState, Inviter, Invi
 import store, { RootState } from '@/app/store';
 import { apiClient } from '@/lib/api';
 import { setStatus, setInvite, setAnswer, setHangup, setSessionState } from '../model/slice';
+import { outgoingCallController } from './outgoingCallController';
 
 class SipService {
   private userAgent: UserAgent | null = null;
@@ -127,31 +128,67 @@ class SipService {
       }
 
       if (this.userAgent instanceof UserAgent && target instanceof URI) {
-        const pc: RTCPeerConnection = (this.session as { peerConnection: RTCPeerConnection }).peerConnection;
-        this.session = new Inviter(this.userAgent, target, {
+        // Conference dial-ins (bridge-manager.tsx) also go through here,
+        // tagged with X-bridgeId — those are tracked in call_sessions, not
+        // in the personal call history, and get no PSTN status/tones.
+        const isBridgeDial = extraHeaders.some((h) => h.startsWith('X-bridgeId:'));
+        // PSTN dialer call: X-Call-Token lets asterserver's ARI tracker report
+        // this call's progress/hangup cause back to us over SSE.
+        const callToken = isBridgeDial ? null : outgoingCallController.start(phone);
+        if (callToken) extraHeaders.push(`X-Call-Token: ${callToken}`);
+
+        const inviter = new Inviter(this.userAgent, target, {
           sessionDescriptionHandlerOptions: {
             constraints: { audio: true, video: false }
           },
+          // Play the provider's 183 audio (ringback / "number unavailable"
+          // announcements) instead of silence until 200 OK.
+          earlyMedia: Boolean(callToken),
           extraHeaders
         });
-        if (this.session instanceof Session) {
-          // Conference dial-ins (bridge-manager.tsx) also go through here,
-          // tagged with X-bridgeId — those are tracked in call_sessions, not
-          // in the personal call history.
-          const isBridgeDial = extraHeaders.some((h) => h.startsWith('X-bridgeId:'));
+        this.session = inviter;
+        {
           const callReport = isBridgeDial ? null : this.reportOutgoingCallStarted(phone, callerId);
 
-          this.session.stateChange.addListener((state: string) => {
+          if (callToken) {
+            inviter.delegate = {
+              onBye: (bye) => {
+                bye.accept().catch(() => undefined);
+                outgoingCallController.onRemoteBye(callToken, bye.request.getHeader('Reason'));
+              },
+            };
+          }
+
+          inviter.stateChange.addListener((state: string) => {
             this.listenSessionState(state);
             if (callReport) {
               if (state === SessionState.Established) this.reportOutgoingCallEvent(callReport, 'answered');
               if (state === SessionState.Terminated) this.reportOutgoingCallEvent(callReport, 'ended');
             }
+            if (callToken && state === SessionState.Terminated) outgoingCallController.onTerminated(callToken);
             listener(state);
           });
-          this.session.invite();
+
+          inviter.invite(callToken ? {
+            requestDelegate: {
+              onProgress: (response) => {
+                const hasSdp = Boolean(response.message.body);
+                outgoingCallController.onProgress(callToken, response.message.statusCode ?? 0, hasSdp);
+                if (hasSdp && this.session === inviter) this.setupRemoteMedia();
+              },
+              onAccept: () => outgoingCallController.onAccept(callToken),
+              onReject: (response) => outgoingCallController.onReject(
+                callToken,
+                response.message.statusCode ?? 0,
+                response.message.reasonPhrase ?? '',
+                response.message.getHeader('Reason'),
+              ),
+            },
+          } : undefined).catch((error) => {
+            console.error('❌ INVITE failed:', error);
+          });
           if (this.turnServer) {
-             const pc = (this.session.sessionDescriptionHandler as unknown as { peerConnection: RTCPeerConnection }).peerConnection;
+             const pc = (inviter.sessionDescriptionHandler as unknown as { peerConnection: RTCPeerConnection }).peerConnection;
              let relayFound = false;
               // 1) Слушаем появление кандидатов
               pc.onicecandidate = (e) => {
@@ -232,9 +269,19 @@ class SipService {
     }
   }
   hangup() {
-    if (this.session instanceof Session && this.session.state !== SessionState.Terminated) {
-      this.session.bye();
-      store.dispatch(setHangup(false));
+    // Always reset the flag — it's an edge trigger (StatusPanel effect on
+    // `hangup`); left at true, the next "hang up" tap would never fire.
+    store.dispatch(setHangup(false));
+    outgoingCallController.onLocalHangup();
+    const session = this.session;
+    if (!(session instanceof Session)) return;
+    if (session instanceof Inviter && (session.state === SessionState.Initial || session.state === SessionState.Establishing)) {
+      // Not answered yet — bye() is invalid here, the INVITE must be CANCELled.
+      session.cancel().catch((error) => console.error('❌ Failed to cancel call:', error));
+    } else if (session instanceof Invitation && session.state === SessionState.Initial) {
+      session.reject().catch((error) => console.error('❌ Failed to reject call:', error));
+    } else if (session.state === SessionState.Established) {
+      session.bye().catch((error) => console.error('❌ Failed to hang up:', error));
     }
   }
   getSession() {

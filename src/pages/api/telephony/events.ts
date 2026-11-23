@@ -81,6 +81,31 @@ const eventsHandler = async (req: AuthenticatedRequest, res: NextApiResponse) =>
     }
   }
 
+  // Outgoing PSTN call progress from asterserver's outgoingCallTracker
+  // (plain dialplan Dial(), no Stasis/bridge). The mini app subscribes to
+  // this event with its own X-Call-Token as event_id before sending INVITE,
+  // so we just relay it — no DB lookup needed.
+  if (event === 'outgoing_call_state') {
+    const callToken = payload.metadata?.call_token;
+    if (typeof callToken !== 'string' || !callToken) {
+      return res.status(400).json({ success: false, error: 'metadata.call_token is required' });
+    }
+    try {
+      await sseClient(`/pushEvent`, {
+        method: 'POST',
+        body: JSON.stringify({
+          event: 'outgoing_call_state',
+          event_id: callToken,
+          payload: payload.metadata,
+        }),
+      });
+      return res.status(200).json({ success: true });
+    } catch (error) {
+      logger.error({ error }, '[telephony/events] Error pushing outgoing_call_state');
+      return res.status(500).json({ success: false, error: 'Internal server error' });
+    }
+  }
+
   let bridgeId = payload.bridge_id;
   let session: any = null;
   let call: Awaited<ReturnType<typeof findCallByBridgeId>> = null;

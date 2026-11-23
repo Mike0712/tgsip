@@ -9,6 +9,7 @@ import {
   BridgeSession,
   BridgeParticipant,
 } from '@/lib/api';
+import type { OutgoingCallInfo } from './outgoingCall';
 
 interface SipState {
   status: 'online' | 'offline';
@@ -40,6 +41,10 @@ interface SipState {
   bridgeSession: BridgeSession | null;
   bridgeStatus: 'idle' | 'creating' | 'active' | 'terminating' | 'completed' | 'failed';
   bridgeParticipants: BridgeParticipant[];
+  /** Status of the current/last outgoing PSTN dialer call (null = nothing to show). */
+  outgoingCall: OutgoingCallInfo | null;
+  /** Number to put into the dialer input (e.g. tapped in call history); Handset consumes and clears it. */
+  dialerPrefill: string | null;
 }
 
 const initialState: SipState = {
@@ -71,6 +76,8 @@ const initialState: SipState = {
   bridgeSession: null,
   bridgeStatus: 'idle',
   bridgeParticipants: [],
+  outgoingCall: null,
+  dialerPrefill: null,
 };
 
 const sipSlice = createSlice({
@@ -174,6 +181,12 @@ const sipSlice = createSlice({
       state.bridgeStatus = 'idle';
       state.bridgeParticipants = [];
     },
+    setOutgoingCall: (state, action: PayloadAction<OutgoingCallInfo | null>) => {
+      state.outgoingCall = action.payload;
+    },
+    setDialerPrefill: (state, action: PayloadAction<string | null>) => {
+      state.dialerPrefill = action.payload;
+    },
     resetInvite: (state) => {
       state.callMode = 'manual';
       state.inviteToken = null;
@@ -187,6 +200,8 @@ const sipSlice = createSlice({
 });
 
 export const { 
+  setOutgoingCall,
+  setDialerPrefill,
   setStatus, 
   setServerUrl, 
   setManualCall,
